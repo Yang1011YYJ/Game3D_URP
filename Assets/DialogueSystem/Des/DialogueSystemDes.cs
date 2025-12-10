@@ -12,14 +12,14 @@ public class DialogueSystemDes : MonoBehaviour
     public TextMeshProUGUI DiaText;
     public Image FaceImage;
     public TextMeshProUGUI Name;
-    public RectTransform dialogueBoxRect;
-    RectTransform textRT;
+    //public RectTransform dialogueBoxRect;
+    //RectTransform textRT;
 
-    [Header("對話框寬度")]
-    public float minWidth = 400f;
-    public float maxWidth = 900f;
-    [Tooltip("從 Scene 讀出來的 padding")] public float leftPadding;
-    [Tooltip("從 Scene 讀出來的 padding")] public float rightPadding;
+    //[Header("對話框寬度")]
+    //public float minWidth = 400f;
+    //public float maxWidth = 900f;
+    //[Tooltip("從 Scene 讀出來的 padding")] public float leftPadding;
+    //[Tooltip("從 Scene 讀出來的 padding")] public float rightPadding;
 
     [Header("文本")]
     public TextAsset TextfileCurrent;
@@ -48,11 +48,15 @@ public class DialogueSystemDes : MonoBehaviour
 
     void Awake()
     {
-        textRT = DiaText.rectTransform;
+        //textRT = DiaText.rectTransform;
 
-        // 讀 Scene 原本排好的距離
-        leftPadding = textRT.offsetMin.x;      // 左邊到父物件的距離
-        rightPadding = -textRT.offsetMax.x;     // 右邊是負的，所以要取負號
+        //// 讀 Scene 原本排好的距離
+        //leftPadding = textRT.offsetMin.x;      // 左邊到父物件的距離
+        //rightPadding = textRT.offsetMax.x;     // 右邊是負的，所以要取負號
+
+        //// Debug 一下確認有抓到值
+        //Debug.Log($"[Dialogue] padding L={leftPadding}, R={rightPadding}");
+
     }
 
     void Start()
@@ -137,7 +141,7 @@ public class DialogueSystemDes : MonoBehaviour
         string line = TextList[index];
 
         // 先依照這一行內容調整對話框的寬度
-        UpdateDialogueBoxWidth(line);
+        //UpdateDialogueBoxWidth(line);
 
         // 如果之前有打字中的協程，先停掉
         if (typingRoutine != null)
@@ -172,9 +176,7 @@ public class DialogueSystemDes : MonoBehaviour
                 // 如果這份對話是 Textfile01，可以在這裡做結束處理
                 if (TextfileCurrent == Textfile01)
                 {
-                    TextPanel.SetActive(false);
-                    text01Finished = true;
-                    index = 0;
+                    HandleDialogueEnd();
                 }
                 yield break;
             }
@@ -228,7 +230,7 @@ public class DialogueSystemDes : MonoBehaviour
         }
 
         // 預設行為：關閉對話框、重置 index
-        TextPanel.SetActive(false);
+        //TextPanel.SetActive(false);
         index = 0;
     }
 
@@ -241,60 +243,64 @@ public class DialogueSystemDes : MonoBehaviour
 
     /// 依照目前這一行的文字長度調整對話框寬度
     /// （記得對話框背景圖請用 Sliced Sprite 才不會變形）
-    void UpdateDialogueBoxWidth(string line)
-    {
-        if (dialogueBoxRect == null || DiaText == null) return;
+    //void UpdateDialogueBoxWidth(string line)
+    //{
+    //    if (dialogueBoxRect == null || DiaText == null)
+    //    {
+    //        Debug.LogError("[Dialogue] dialogueBoxRect 或 DiaText 是 null，沒有東西可以調寬！");
+    //        return;
+    //    }
 
-        // 內文字區域能用的最大寬度（對話框最大寬度扣掉左右 padding）
-        float innerMaxWidth = maxWidth - leftPadding - rightPadding;
+    //    // 🔎 1. 進來時先印出現在的寬度
+    //    Debug.Log($"[Dialogue] 呼叫 UpdateDialogueBoxWidth，目標台詞：\"{line}\"");
+    //    Debug.Log($"[Dialogue] 進來前 dialogueBoxRect.sizeDelta.x = {dialogueBoxRect.sizeDelta.x}");
 
-        // 用 TMP 算這一行理論上需要的寬度（不限制高度，寬度給一個上限）
-        // 這裡給 innerMaxWidth，是在問：「如果我最多給你這麼寬，你會排多少」
-        Vector2 pref = DiaText.GetPreferredValues(line, innerMaxWidth, Mathf.Infinity);
-        float neededWidth = pref.x;
+    //    // 1️⃣ 先算「完全不換行」時的理論寬度
+    //    DiaText.enableWordWrapping = false;
+    //    Vector2 prefNoWrap = DiaText.GetPreferredValues(line, Mathf.Infinity, Mathf.Infinity);
+    //    float rawWidth = prefNoWrap.x;
 
-        // 取得文字 RectTransform
-        RectTransform textRT = DiaText.rectTransform;
+    //    // 2️⃣ 算出文字可用的最大寬度（扣掉左右 padding）
+    //    float innerMaxWidth = maxWidth - leftPadding - rightPadding;
 
-        float finalBoxWidth;  // 背景框實際寬度
+    //    float textAreaWidth;
+    //    bool willWrap;
 
-        if (neededWidth <= innerMaxWidth)
-        {
-            // ✅ 文字一行就裝得下：拉到剛好包住文字＋padding，不要硬換行
-            DiaText.enableWordWrapping = false;
+    //    if (rawWidth <= innerMaxWidth)
+    //    {
+    //        // ✅ 可以一行顯示完
+    //        willWrap = false;
+    //        textAreaWidth = rawWidth;
+    //    }
+    //    else
+    //    {
+    //        // ❗太長了，一行裝不下，限制寬度讓它自動換行
+    //        willWrap = true;
+    //        textAreaWidth = innerMaxWidth;
+    //    }
 
-            float textAreaWidth = neededWidth;
+    //    float finalBoxWidth = Mathf.Clamp(
+    //        textAreaWidth + leftPadding + rightPadding,
+    //        minWidth,
+    //        maxWidth
+    //    );
 
-            finalBoxWidth = Mathf.Clamp(textAreaWidth + leftPadding + rightPadding,
-                                        minWidth, maxWidth);
+    //    Debug.Log($"[Dialogue] rawWidth = {rawWidth}, innerMaxWidth = {innerMaxWidth}, textAreaWidth = {textAreaWidth}, finalBoxWidth = {finalBoxWidth}");
 
-            // 這裡用 offset 來維持 padding：左邊固定 leftPadding，右邊固定 rightPadding
-            textRT.anchorMin = new Vector2(0, textRT.anchorMin.y);
-            textRT.anchorMax = new Vector2(1, textRT.anchorMax.y);
+    //    // 4️⃣ 套用到背景框 RectTransform
+    //    dialogueBoxRect.SetSizeWithCurrentAnchors(
+    //        RectTransform.Axis.Horizontal,
+    //        finalBoxWidth
+    //    );
 
-            // offsetMin.x = 左邊距父物件的距離
-            // offsetMax.x = 右邊距父物件的距離（注意為負）
-            textRT.offsetMin = new Vector2(leftPadding, textRT.offsetMin.y);
-            textRT.offsetMax = new Vector2(-rightPadding, textRT.offsetMax.y);
-        }
-        else
-        {
-            // ❗裝不下一行：固定內文字區為 innerMaxWidth，交給 TMP 自己換行
-            DiaText.enableWordWrapping = true;
+    //    Debug.Log($"[Dialogue] 設定後 dialogueBoxRect.sizeDelta.x = {dialogueBoxRect.sizeDelta.x}");
 
-            float textAreaWidth = innerMaxWidth;
-            finalBoxWidth = maxWidth;   // 整個對話框就用最大寬度
+    //    // 5️⃣ 文字更新
+    //    DiaText.enableWordWrapping = willWrap;
+    //    DiaText.text = line;
+    //    DiaText.ForceMeshUpdate();
+    //}
 
-            textRT.anchorMin = new Vector2(0, textRT.anchorMin.y);
-            textRT.anchorMax = new Vector2(1, textRT.anchorMax.y);
-            textRT.offsetMin = new Vector2(leftPadding, textRT.offsetMin.y);
-            textRT.offsetMax = new Vector2(-rightPadding, textRT.offsetMax.y);
-        }
 
-        // 套到背景對話框（記得背景的 Image 用 Sliced）
-        var boxSize = dialogueBoxRect.sizeDelta;
-        boxSize.x = finalBoxWidth;
-        dialogueBoxRect.sizeDelta = boxSize;
-    }
 }
 

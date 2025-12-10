@@ -119,7 +119,7 @@ public class desC : MonoBehaviour
         dialogueSystemDesScript.StartDialogue(dialogueSystemDesScript.Textfile01);
         yield return new WaitForSeconds(0.5f);
         yield return new WaitUntil(() => dialogueSystemDesScript.text01Finished);
-        yield return new WaitForSeconds(1.5f);
+        yield return new WaitForSeconds(2f);
         //對話結束，不看手機
         dialogueSystemDesScript.TextPanel.SetActive(false);
         PlayerAnimator.SetBool("phone", false);
