@@ -269,7 +269,7 @@ public class First : MonoBehaviour
         //}
     }
 
-    IEnumerator WaitForAnimation(Animator animator, string stateName)
+    public IEnumerator WaitForAnimation(Animator animator, string stateName)
     {
         // 等到進入該動畫 state
         while (!animator.GetCurrentAnimatorStateInfo(0).IsName(stateName))

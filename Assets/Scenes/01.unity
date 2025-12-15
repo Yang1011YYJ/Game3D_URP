@@ -5322,15 +5322,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   TextPanel: {fileID: 369736273}
   DiaText: {fileID: 2113736293}
-  FaceImage: {fileID: 0}
-  Name: {fileID: 0}
   NarraTextPanel: {fileID: 2093460617}
+  NarraText: {fileID: 0}
   TextfileCurrent: {fileID: 0}
   TextfileGame00: {fileID: 4900000, guid: 54fe5100b7dd5f24c8fc06c04c091f5c, type: 3}
   TextfileLookPhone: {fileID: 4900000, guid: 897b74c3bed65dc43bd994de490eba8b, type: 3}
-  index: 0
   TextSpeed: 0.06
   playOnEnable: 0
+  allowFastReveal: 0
+  cControllScript: {fileID: 0}
+  firstScript: {fileID: 0}
+  index: 0
   isTyping: 0
 --- !u!114 &1577382532
 MonoBehaviour:
