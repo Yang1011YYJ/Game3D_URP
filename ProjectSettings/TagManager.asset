@@ -3,13 +3,12 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 2
-  tags:
-  - ET1
+  tags: []
   layers:
   - Default
   - TransparentFX
   - Ignore Raycast
-  - PostProcess
+  - 
   - Water
   - UI
   - 
@@ -43,8 +42,8 @@ TagManager:
     uniqueID: 0
     locked: 0
   - name: CC
-    uniqueID: 692661305
+    uniqueID: 3656118847
     locked: 0
   - name: UI
-    uniqueID: 373733047
+    uniqueID: 2257921981
     locked: 0

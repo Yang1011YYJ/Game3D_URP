@@ -312,6 +312,10 @@ MonoBehaviour:
   Catch: {fileID: 7400000, guid: 32a47645d54c1394bba9205a7c0db989, type: 2}
   eyeclose: {fileID: 7400000, guid: 3639e35013cc37b459bdaaabc28e44fe, type: 2}
   spriteRenderer: {fileID: 0}
+  targetCamera: {fileID: 0}
+  lockX: 0
+  lockY: 0
+  lockZ: 0
   rig: {fileID: 0}
   moveSpeed: 5
   maxSpeed: 10
@@ -2213,7 +2217,7 @@ MonoBehaviour:
   trainSpeed: 10
   DesPanel: {fileID: 396994186}
   BlackPanel: {fileID: 393068252}
-  PlaceText: {fileID: 0}
+  PlaceText: {fileID: 17691526}
   Player: {fileID: 35876372}
   playerTransform: {fileID: 35876378}
   walkSpeed: 5

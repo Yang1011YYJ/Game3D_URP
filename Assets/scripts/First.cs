@@ -15,7 +15,6 @@ public class First : MonoBehaviour
     public DialogueSystemGame00 DSG00;
     public TimeControll timer;
     public CameraMoveControll cameraMoveControllScript;
-    public PostExposureFader postExposureFaderScript;
 
     [Header("異常相關")]
     [Tooltip("異常畫面的背景")]public GameObject ErrorPanel;
@@ -65,7 +64,6 @@ public class First : MonoBehaviour
         DSG00 = FindAnyObjectByType<DialogueSystemGame00>();
         timer = FindAnyObjectByType<TimeControll>();
         cameraMoveControllScript = FindAnyObjectByType<CameraMoveControll>();
-        postExposureFaderScript = FindAnyObjectByType<PostExposureFader>();
         if (cControllScript == null)
         {
             cControllScript = FindAnyObjectByType<CControll>();
@@ -114,7 +112,7 @@ public class First : MonoBehaviour
         //    yield return new WaitForSeconds(1.5f);
         //    BlackPanel.SetActive(false);
         //}
-        yield return StartCoroutine(postExposureFaderScript.FadeExposure(lightUPDuration/*持續時間*/, -3f, 0f));
+        //yield return StartCoroutine(postExposureFaderScript.FadeExposure(lightUPDuration/*持續時間*/, -3f, 0f));
 
 
         // 2. 鏡頭回到公車內（先把鏡頭放在起點，再移到目標）

@@ -686,48 +686,6 @@ TextureImporter:
       indices: 
       edges: []
       weights: []
-    - serializedVersion: 2
-      name: eyeclose01
-      rect:
-        serializedVersion: 2
-        x: 384
-        y: 215
-        width: 87
-        height: 165
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      outline: []
-      physicsShape: []
-      tessellationDetail: 0
-      bones: []
-      spriteID: e7b78d7e05ec1a14580eb6cd0bba25b2
-      internalID: 2129065423
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: eyeclose02
-      rect:
-        serializedVersion: 2
-        x: 479
-        y: 215
-        width: 87
-        height: 165
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      outline: []
-      physicsShape: []
-      tessellationDetail: 0
-      bones: []
-      spriteID: 3c7ce30de690e8241a3c5fcb81a47551
-      internalID: -1232178596
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
     outline: []
     physicsShape: []
     bones: []
@@ -744,8 +702,6 @@ TextureImporter:
       catch01: 440185121
       catch02: 380653387
       die: 680626711
-      eyeclose01: 2129065423
-      eyeclose02: -1232178596
       idle: -2555380
       leftidle: 1884803816
       phone01: 1470294774
