@@ -10,9 +10,9 @@ public class DialogueSystemGame00 : MonoBehaviour
     [Header("UI")]
     public GameObject TextPanel;
     public TextMeshProUGUI DiaText;
-    public Image FaceImage;
-    public TextMeshProUGUI Name;
-    [Tooltip("旁白對話框")] public GameObject NarraTextPanel;
+
+    [Header("旁白對話框")] public GameObject NarraTextPanel;
+    public TextMeshProUGUI NarraText;
 
     [Header("文本")]
     public TextAsset TextfileCurrent;
@@ -20,14 +20,11 @@ public class DialogueSystemGame00 : MonoBehaviour
     public TextAsset TextfileLookPhone;
 
     [Header("打字設定")]
-    [Tooltip("讀到第幾行")]
-    public int index = 0;
-    [Tooltip("控制打字節奏（字元出現的間隔時間）")]
-    public float TextSpeed = 0.06f;
+    [Tooltip("讀到第幾行")]public int index = 0;
+    [Tooltip("控制打字節奏（字元出現的間隔時間）")]public float TextSpeed = 0.06f;
 
     [Header("控制設定")]
-    [Tooltip("物件啟用時是否自動開始播放對話")]
-    public bool playOnEnable = false;
+    [Tooltip("物件啟用時是否自動開始播放對話")]public bool playOnEnable = false;
 
     // 內部狀態
     private List<string> TextList = new List<string>();
@@ -70,7 +67,6 @@ public class DialogueSystemGame00 : MonoBehaviour
                         TextPanel.SetActive(false);
                         isTyping = false;
                         index = 0;
-
                     }
                 }
                 else
