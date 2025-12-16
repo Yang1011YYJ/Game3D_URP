@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -7,15 +6,22 @@ using UnityEngine.Rendering.Universal;
 public class FadeInByExposure : MonoBehaviour
 {
     public Volume volume;
-    ColorAdjustments ca;
+    private ColorAdjustments ca;
 
     void Awake()
     {
-        if (volume && volume.profile) volume.profile.TryGet(out ca);
+        Cache();
+    }
+
+    private void Cache()
+    {
+        if (volume != null && volume.profile != null)
+            volume.profile.TryGet(out ca);
     }
 
     public IEnumerator FadeExposure(float duration, float from, float to)
     {
+        if (ca == null) Cache();
         if (ca == null) yield break;
 
         float t = 0f;
@@ -27,6 +33,15 @@ public class FadeInByExposure : MonoBehaviour
             ca.postExposure.value = Mathf.Lerp(from, to, t / duration);
             yield return null;
         }
+
         ca.postExposure.value = to;
+    }
+
+    public void SetExposureImmediate(float value)
+    {
+        if (ca == null) Cache();
+        if (ca == null) return;
+
+        ca.postExposure.value = value;
     }
 }

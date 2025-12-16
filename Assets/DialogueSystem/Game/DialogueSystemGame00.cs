@@ -17,6 +17,7 @@ public class DialogueSystemGame00 : MonoBehaviour
     [Header("文本")]
     public TextAsset TextfileCurrent;
     public TextAsset TextfileGame00;
+    public TextAsset TextfileGame01;
     public TextAsset TextfileLookPhone;
 
     [Header("打字設定")]
@@ -26,6 +27,14 @@ public class DialogueSystemGame00 : MonoBehaviour
     [Tooltip("物件啟用時是否自動開始播放對話")]public bool playOnEnable = false;
     [Tooltip("允許快速顯示內容")] public bool allowFastReveal;
     [Tooltip("第一段劇情撥完")] public bool FirstDiaFinished;
+
+    [Header("跳過")]
+    [Tooltip("跳過")] public bool skipRequested = false;
+    public SceneCheckpoint currentCP = SceneCheckpoint.Start;
+    public SceneCheckpoint skipToCP = SceneCheckpoint.Start;
+    [Tooltip("允許跳過教學")] public bool allowSkipTeaching = false;
+    public Dictionary<string, int> labelToIndex = new Dictionary<string, int>();
+
 
     [Header("腳本")]
     public CControll cControllScript;
@@ -48,6 +57,10 @@ public class DialogueSystemGame00 : MonoBehaviour
     [Tooltip("標記是否正在打字")]public bool isTyping = false;
     private Coroutine typingRoutine;
     private bool isBusy = false; // 執行動作/等待中，先鎖住輸入
+    // 旁白累加（讓幾句旁白不被洗掉）
+    [Tooltip("是否進入「旁白保留模式」")]public bool narraSticky = false;      // 是否進入「旁白保留模式」
+    [Tooltip("旁白顯示時用 append 而不是覆蓋")] public bool narraAppendMode = false;  // 旁白顯示時用 append 而不是覆蓋
+
 
     void Awake()
     {
@@ -106,6 +119,49 @@ public class DialogueSystemGame00 : MonoBehaviour
     //    }
     //}
 
+    [SerializeField] private string mandatoryLabelPrefix = "Label_MUST_";
+
+    // 從目前 index 往後找「下一個必到 label」的位置
+    public int FindNextMandatoryLabelIndex(int fromIndex)
+    {
+        int start = Mathf.Clamp(fromIndex + 1, 0, TextList.Count - 1);
+
+        for (int i = start; i < TextList.Count; i++)
+        {
+            if (TextList[i].code != LineCode.Action) continue;
+
+            string key = TextList[i].content.Trim();
+            if (key.StartsWith(mandatoryLabelPrefix))
+                return i;
+        }
+        return -1;
+    }
+
+    public bool SkipToNextMandatoryLabel()
+    {
+        if (TextList == null || TextList.Count == 0) return false;
+
+        int target = FindNextMandatoryLabelIndex(index);
+        if (target < 0)
+        {
+            Debug.Log("[Dialogue] No next mandatory label found, skip ignored.");
+            return false;
+        }
+
+        // 清掉打字與面板，避免殘影
+        StopTyping();
+        isTyping = false;
+        isBusy = false;
+        SetPanels(false, false);
+
+        index = target;
+
+        Debug.Log($"[Dialogue] Skip -> index={index} ({TextList[index].content})");
+        SetTextUI(); // 讓它從 label 那行開始繼續跑（通常 label 本身是空動作）
+        return true;
+    }
+
+
     // 從外部開始對話（可以指定要播哪個 TextAsset）
     public void StartDialogue(TextAsset textAsset)
     {
@@ -146,7 +202,7 @@ public class DialogueSystemGame00 : MonoBehaviour
             cleaned.Add(s);
         }
 
-        // 必須是偶數行：code, content, code, content...
+        // 必須是偶數行：code, content, code, content……
         if (cleaned.Count % 2 != 0)
             Debug.LogWarning("[DialogueSystemGame00] 文本行數不是偶數，最後一行可能缺 content。會忽略最後一行。");
 
@@ -161,7 +217,38 @@ public class DialogueSystemGame00 : MonoBehaviour
             var code = (LineCode)Mathf.Clamp(raw, 0, 2);
             TextList.Add(new DialogueEntry(code, cleaned[i + 1]));
         }
+        labelToIndex.Clear();
+        for (int i = 0; i < TextList.Count; i++)
+        {
+            if (TextList[i].code == LineCode.Action)
+            {
+                string k = TextList[i].content.Trim();
+                if (k.StartsWith("Label_"))
+                    labelToIndex[k] = i;
+            }
+        }
     }
+
+    public void JumpToLabel(string labelKey, bool runImmediately = true)
+    {
+        if (!labelToIndex.TryGetValue(labelKey, out int target))
+        {
+            Debug.LogWarning($"[Dialogue] label not found: {labelKey}");
+            return;
+        }
+
+        // 收乾淨，避免打字/面板殘留
+        StopTyping();
+        isTyping = false;
+        isBusy = false;
+        SetPanels(false, false);
+
+        index = target;
+
+        if (runImmediately)
+            SetTextUI();
+    }
+
 
     public void StopTyping()
     {
@@ -184,6 +271,18 @@ public class DialogueSystemGame00 : MonoBehaviour
         StopTyping();
 
         var line = TextList[index];
+        // 這三句旁白要「保留在對話框上」→ 開啟旁白累加模式
+        if (line.code == LineCode.Narration)
+        {
+            if (line.content.StartsWith("雖然不明白發生了什麼") ||
+                line.content.StartsWith("拍照、在時限內找出異常") ||
+                line.content.StartsWith("成功找出異常後"))
+            {
+                narraSticky = true;
+                narraAppendMode = true; // 這幾句開始用 append
+            }
+        }
+
 
         switch (line.code)
         {
@@ -205,6 +304,7 @@ public class DialogueSystemGame00 : MonoBehaviour
                 break;
         }
     }
+
 
 
     // 打字機：一個字一個蹦出來
@@ -240,8 +340,41 @@ public class DialogueSystemGame00 : MonoBehaviour
             Debug.LogWarning("[DialogueSystemGame00] NarraText 沒指定，旁白不顯示。");
             return;
         }
-        typingRoutine = StartCoroutine(TypeLine(NarraText, content));
+
+        // 旁白累加模式：不清空，直接換行加上去
+        if (narraAppendMode)
+        {
+            StopTyping();
+            isTyping = false;
+            typingRoutine = StartCoroutine(TypeLineAppend(NarraText, content));
+        }
+        else
+        {
+            typingRoutine = StartCoroutine(TypeLine(NarraText, content));
+        }
     }
+
+    // 新增：旁白 append 的打字機
+    IEnumerator TypeLineAppend(TextMeshProUGUI target, string line)
+    {
+        if (target == null) yield break;
+
+        isTyping = true;
+
+        // 已有文字就先換行
+        if (!string.IsNullOrEmpty(target.text))
+            target.text += "\n";
+
+        foreach (char c in line)
+        {
+            target.text += c;
+            yield return new WaitForSeconds(TextSpeed);
+        }
+
+        isTyping = false;
+        typingRoutine = null;
+    }
+
 
     public void SetPanels(bool playerOn, bool narraOn)
     {
@@ -325,9 +458,14 @@ public class DialogueSystemGame00 : MonoBehaviour
                 cControllScript.animator.SetBool("eyeclose", false);
                 break;
 
-            case "LightOff":
+            case "BlackPanelOn":
                 //yield return StartCoroutine(firstScript.fader.FadeExposure(0.1f/*持續時間*/, 0.5f/*起始*/, -10f/*終點*/));
                 firstScript.BlackPanel.SetActive(true);
+                break;
+
+            case "BlackPanelOff":
+                //yield return StartCoroutine(firstScript.fader.FadeExposure(0.1f/*持續時間*/, 0.5f/*起始*/, -10f/*終點*/));
+                firstScript.BlackPanel.SetActive(false);
                 break;
 
             case "LeftAndRight":
@@ -354,7 +492,86 @@ public class DialogueSystemGame00 : MonoBehaviour
                 cControllScript.animator.SetBool("phone", false);
                 break;
 
+            // 1) WaitForTeach：教學中，等回到遊戲畫面才繼續
+            case "WaitForTeach":
+                // 你需要在 First 裡做一個旗標（下面我會告訴你加哪裡）
+                yield return new WaitUntil(() => firstScript.teachRoutine == null);
+
+                break;
+
+            // 2) Tutorial_AnomalyAppear：進入教學2，結束才回來繼續對話
+            case "Tutorial_AnomalyAppear":
+                if (firstScript != null)
+                    firstScript.RequestTeach2(); // 只發請求，不在這裡跑協程
+                break;
+
+            // 3) Tutorial_ExplainInterrupted：把旁白框關掉、並解除「旁白保留模式」
+            case "Tutorial_ExplainInterrupted":
+                narraSticky = false;
+                narraAppendMode = false;
+                if (NarraText != null) NarraText.text = "";
+                SetPanels(false, false); // 關掉旁白對話框
+                break;
+
+            // 4) LightOn：燈光恢復正常
+            case "LightOn":
+                if (firstScript != null && firstScript.fader != null)
+                    yield return firstScript.StartCoroutine(firstScript.fader.FadeExposure(0.8f, -10f, 0.5f));
+                break;
+
+            // 5) LightFlicker：燈光閃爍（你可自己決定閃幾次）
+            case "LightFlicker":
+                if (firstScript != null)
+                    yield return firstScript.StartCoroutine(firstScript.LightFlickerOnce());
+                break;
+
+            // 6) LightDimDown：燈光暗下來（曝光 0.5 → -10）
+            case "LightDimDown":
+                if (firstScript != null && firstScript.fader != null)
+                    yield return firstScript.StartCoroutine(firstScript.fader.FadeExposure(0.8f, 0.5f, -10f));
+                break;
+
+            // 7) BusShake_Strong：車子搖晃（你做成相機震動或物件晃動）
+            case "BusShake_Strong":
+                if (firstScript != null)
+                    //yield return firstScript.StartCoroutine(firstScript.BusShakeStrong(1.0f));
+                    yield return null;
+                break;
+
+            // 8) ShowPhoto_S02_Photo_01b：照片出現
+            case "ShowPhoto_S02_Photo_01b":
+                if (firstScript != null)
+                    firstScript.ShowPhoto("S02_Photo_01b");
+                break;
+
+            // 9) bigpicture：放大照片 target 區塊到指定大小
+            case "bigpicture":
+                if (firstScript != null)
+                    yield return firstScript.StartCoroutine(firstScript.BigPictureZoom());
+                break;
+
+            // 10) TimeJump_1930：時間改變
+            case "TimeJump_1930":
+                if (firstScript != null)
+                    firstScript.SetTimeText("19:30");
+                break;
+
+            // 12) ShowTitle_Game_Title：遊戲名稱顯示
+            case "ShowTitle_Game_Title":
+                if (firstScript != null)
+                    yield return firstScript.StartCoroutine(firstScript.ShowGameTitle());
+                break;
+
+            case "InTeach":
+                FirstDiaFinished = true;
+                allowFastReveal = true;
+                if (firstScript != null)
+                    yield return firstScript.StartCoroutine(firstScript.RunTeach1());
+                break;
+
             default:
+                // 沒吃到的 key，就當作空動作（但建議 log 方便你抓拼字）
+                Debug.LogWarning($"[DialogueSystemGame00] 未處理的 Action key: {key}");
                 break;
         }
     }
@@ -378,17 +595,12 @@ public class DialogueSystemGame00 : MonoBehaviour
 
     private void FinishDialogue()
     {
-        if (TextfileCurrent == TextfileGame00)
-        {
-            FirstDiaFinished = true;
-            allowFastReveal = true;
-        }
+        //if (TextfileCurrent == TextfileGame00)
+        //{
+        //    FirstDiaFinished = true;
+        //    allowFastReveal = true;
+        //}
         EndDialogue();
     }
-
-
-
-
-
 }
 
