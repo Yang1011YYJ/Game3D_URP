@@ -7,7 +7,7 @@ public class CControll : MonoBehaviour
 {
     [Header("動畫")]
     public Animator animator;
-    public AnimationClip idle;
+    public Sprite idle;
     [Tooltip("看手機")]public AnimationClip phone;
     [Tooltip("走路")] public AnimationClip walk;
     [Tooltip("轉身")] public AnimationClip turn;
@@ -18,6 +18,7 @@ public class CControll : MonoBehaviour
     [Tooltip("面相左邊")] public Sprite leftidle;
 
     [Header("角色外表")]
+    public GameObject PlayerAniAndSprite;
     public SpriteRenderer spriteRenderer;
 
     [Header("相機")]
@@ -56,7 +57,7 @@ public class CControll : MonoBehaviour
         // SpriteRenderer
         if (spriteRenderer == null)
         {
-            spriteRenderer = GetComponent<SpriteRenderer>();
+            spriteRenderer = PlayerAniAndSprite.GetComponent<SpriteRenderer>();
             if (spriteRenderer == null)
                 spriteRenderer = GetComponentInChildren<SpriteRenderer>();
             if (spriteRenderer == null)

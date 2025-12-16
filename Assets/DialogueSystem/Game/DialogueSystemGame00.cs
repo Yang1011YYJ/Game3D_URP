@@ -25,6 +25,7 @@ public class DialogueSystemGame00 : MonoBehaviour
     [Header("控制設定")]
     [Tooltip("物件啟用時是否自動開始播放對話")]public bool playOnEnable = false;
     [Tooltip("允許快速顯示內容")] public bool allowFastReveal;
+    [Tooltip("第一段劇情撥完")] public bool FirstDiaFinished;
 
     [Header("腳本")]
     public CControll cControllScript;
@@ -81,10 +82,7 @@ public class DialogueSystemGame00 : MonoBehaviour
         index++;
         if (index >= TextList.Count)
         {
-            if (TextfileCurrent == TextfileGame00)
-            {
-                EndDialogue();
-            }
+            FinishDialogue();
             return;
         }
 
@@ -116,6 +114,8 @@ public class DialogueSystemGame00 : MonoBehaviour
             Debug.LogWarning("[DialogueSystemGame00] StartDialogue textAsset is null");
             return;
         }
+
+        if (textAsset == TextfileGame00) FirstDiaFinished = false;
 
         TextfileCurrent = textAsset;
         ParseFileToEntries(TextfileCurrent);
@@ -289,7 +289,7 @@ public class DialogueSystemGame00 : MonoBehaviour
 
         // 動作完成 → 自動下一句
         index++;
-        if (index >= TextList.Count) EndDialogue();
+        if (index >= TextList.Count) FinishDialogue();
         else SetTextUI();
     }
 
@@ -306,10 +306,11 @@ public class DialogueSystemGame00 : MonoBehaviour
                 firstScript.PhonePanel.SetActive(true);
                 yield return new WaitForSeconds(2f);
                 firstScript.PhonePanel.SetActive(false);
+                cControllScript.animator.SetBool("phone", false);
                 break;
 
             case "WalkToFront":
-                cControllScript.Target = new Vector2();
+                cControllScript.Target = new Vector3(-7.97f, 1.96f, -1.71f);
                 cControllScript.autoMoveFinished = false;
                 cControllScript.animator.SetBool("walk", true);
                 cControllScript.isAutoMoving = true;
@@ -325,19 +326,21 @@ public class DialogueSystemGame00 : MonoBehaviour
                 break;
 
             case "LightOff":
-                yield return StartCoroutine(firstScript.fader.FadeExposure(0.1f/*持續時間*/, 0.5f/*起始*/, -10f/*終點*/));
+                //yield return StartCoroutine(firstScript.fader.FadeExposure(0.1f/*持續時間*/, 0.5f/*起始*/, -10f/*終點*/));
+                firstScript.BlackPanel.SetActive(true);
                 break;
 
             case "LeftAndRight":
-                cControllScript.GetComponent<SpriteRenderer>().sprite = cControllScript.leftidle;
+                cControllScript.PlayerAniAndSprite.GetComponent<SpriteRenderer>().sprite = cControllScript.leftidle;
                 yield return new WaitForSeconds(0.5f);
-                cControllScript.GetComponent<SpriteRenderer>().flipX = true;//面向右邊
+                cControllScript.PlayerAniAndSprite.GetComponent<SpriteRenderer>().flipX = true;//面向右邊
                 yield return new WaitForSeconds(0.5f);
-                cControllScript.GetComponent<SpriteRenderer>().flipX = false;//面向左邊
+                cControllScript.PlayerAniAndSprite.GetComponent<SpriteRenderer>().flipX = false;//面向左邊
                 yield return new WaitForSeconds(0.5f);
-                cControllScript.GetComponent<SpriteRenderer>().flipX = true;//面向右邊
+                cControllScript.PlayerAniAndSprite.GetComponent<SpriteRenderer>().flipX = true;//面向右邊
                 yield return new WaitForSeconds(0.5f);
-                cControllScript.GetComponent<SpriteRenderer>().flipX = false;//面向左邊
+                cControllScript.PlayerAniAndSprite.GetComponent<SpriteRenderer>().flipX = false;//面向左邊
+                cControllScript.PlayerAniAndSprite.GetComponent<SpriteRenderer>().sprite = cControllScript.idle;
                 break;
 
             case "PhoneOn":
@@ -348,6 +351,7 @@ public class DialogueSystemGame00 : MonoBehaviour
                 cControllScript.animator.SetBool("phone", true);
                 yield return StartCoroutine(firstScript.WaitForAnimation(cControllScript.animator, "phone"));
                 firstScript.PhonePanel.SetActive(true);
+                cControllScript.animator.SetBool("phone", false);
                 break;
 
             default:
@@ -372,7 +376,15 @@ public class DialogueSystemGame00 : MonoBehaviour
         StopTyping();
     }
 
-
+    private void FinishDialogue()
+    {
+        if (TextfileCurrent == TextfileGame00)
+        {
+            FirstDiaFinished = true;
+            allowFastReveal = true;
+        }
+        EndDialogue();
+    }
 
 
 
