@@ -184,7 +184,8 @@ MonoBehaviour:
   m_text: "-\u96F2\u6797\u9AD8\u9435\u7AD9-"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 0e3706e96b1738b41ba4b41cdebd5860, type: 2}
-  m_sharedMaterial: {fileID: -116315631800015052, guid: 0e3706e96b1738b41ba4b41cdebd5860, type: 2}
+  m_sharedMaterial: {fileID: 5832394274478373412, guid: 0e3706e96b1738b41ba4b41cdebd5860,
+    type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -311,6 +312,8 @@ MonoBehaviour:
   sitsleep: {fileID: 7400000, guid: 1f824ecd2ec5b0346bfd8ba30a9f37f3, type: 2}
   Catch: {fileID: 7400000, guid: 32a47645d54c1394bba9205a7c0db989, type: 2}
   eyeclose: {fileID: 7400000, guid: 3639e35013cc37b459bdaaabc28e44fe, type: 2}
+  leftidle: {fileID: 0}
+  PlayerAniAndSprite: {fileID: 0}
   spriteRenderer: {fileID: 0}
   targetCamera: {fileID: 0}
   lockX: 0
@@ -354,7 +357,7 @@ SortingGroup:
   m_GameObject: {fileID: 35876372}
   m_Enabled: 1
   m_SortingLayerID: 692661305
-  m_SortingLayer: 1
+  m_SortingLayer: 0
   m_SortingOrder: 0
   m_SortAtRoot: 0
 --- !u!136 &35876380
@@ -643,7 +646,7 @@ SpriteRenderer:
   m_Size: {x: 1.97, y: 3.43}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 1
+  m_WasSpriteAssigned: 0
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
 --- !u!1 &160044694
@@ -749,7 +752,7 @@ SpriteRenderer:
   m_Size: {x: 2.96, y: 3.48}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 1
+  m_WasSpriteAssigned: 0
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
 --- !u!1 &209649951
@@ -1450,7 +1453,8 @@ MonoBehaviour:
   m_text: Button
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 0e3706e96b1738b41ba4b41cdebd5860, type: 2}
-  m_sharedMaterial: {fileID: -116315631800015052, guid: 0e3706e96b1738b41ba4b41cdebd5860, type: 2}
+  m_sharedMaterial: {fileID: 5832394274478373412, guid: 0e3706e96b1738b41ba4b41cdebd5860,
+    type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -1917,8 +1921,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\u5426"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 1dc2ffdb80dd88f4d96596e73aba1261, type: 2}
-  m_sharedMaterial: {fileID: 4013858086083392826, guid: 1dc2ffdb80dd88f4d96596e73aba1261, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -2099,7 +2103,7 @@ SpriteRenderer:
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 692661305
-  m_SortingLayer: 1
+  m_SortingLayer: 0
   m_SortingOrder: 0
   m_Sprite: {fileID: -2555380, guid: 80c58d42d429a0b46ad53a3977148306, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -2478,8 +2482,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: X
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 1dc2ffdb80dd88f4d96596e73aba1261, type: 2}
-  m_sharedMaterial: {fileID: 4013858086083392826, guid: 1dc2ffdb80dd88f4d96596e73aba1261, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -2820,6 +2824,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1954958775}
   - component: {fileID: 1954958776}
+  - component: {fileID: 1954958777}
   m_Layer: 0
   m_Name: Spot Light
   m_TagString: Untagged
@@ -2904,6 +2909,29 @@ Light:
   m_UseViewFrustumForShadowCasterCull: 1
   m_ShadowRadius: 0
   m_ShadowAngle: 0
+--- !u!114 &1954958777
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1954958774}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
 --- !u!1 &1968115336
 GameObject:
   m_ObjectHideFlags: 0
@@ -2963,8 +2991,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\u662F"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 1dc2ffdb80dd88f4d96596e73aba1261, type: 2}
-  m_sharedMaterial: {fileID: 4013858086083392826, guid: 1dc2ffdb80dd88f4d96596e73aba1261, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []

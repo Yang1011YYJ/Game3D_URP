@@ -85,6 +85,12 @@ public class First : MonoBehaviour
     public Transform StartPoint;
     public float MoveSpeed =5f;
     public float lightUPDuration = 1.2f;
+    [Header("Big Picture Zoom (Perspective Camera)")]
+    [Tooltip("照片上對焦的「空物件」")]public Transform bigPictureTarget;      // 照片上對焦的「空物件」
+    [Tooltip("推進/拉回時間")] public float zoomDuration = 0.8f;        // 推進/拉回時間
+    [Tooltip("放大後停留秒數")] public float zoomHoldTime = 3f;           // 放大後停留秒數
+    [Tooltip("相機往前推的距離")] public float zoomDistance = 2.5f;         // 相機往前推的距離
+
 
     [Header("拍照框點擊狀態")]
     public bool photoFrameClicked = false;
@@ -352,12 +358,22 @@ public class First : MonoBehaviour
         //    yield return StartCoroutine(fader.FadeExposure(1.0f, baseExposure, darkExposure));
 
         // 2) 打開 error panel
+        Debug.Log("[Teach] AbnormalCaptureFlow ENTER");
         openErrorPanel();
 
         // 等淡入完成
         var cg = ErrorPanel != null ? ErrorPanel.GetComponent<CanvasGroup>() : null;
         if (cg != null)
             yield return new WaitUntil(() => cg.alpha >= 1f);
+
+        // 4) 顯示提示文字（你可以改文案）
+        if (HintText != null)
+        {
+            HintText.gameObject.SetActive(true);
+            HintText.text = showSmile
+                ? "盡快點擊異常！"
+                : "對準異常，按下快門";
+        }
 
         // 3) 第二段：等 3 秒後 smile 出現
         if (showSmile && smileTf != null)
@@ -368,15 +384,6 @@ public class First : MonoBehaviour
 
             // 第二段目標就是 smile
             targetTf = smileTf;
-        }
-
-        // 4) 顯示提示文字（你可以改文案）
-        if (HintText != null)
-        {
-            HintText.gameObject.SetActive(true);
-            HintText.text = showSmile
-                ? "盡快點擊異常！"
-                : "對準異常，按下快門";
         }
 
         // 5) 指引框出現 + 移到指定目標
@@ -455,6 +462,7 @@ public class First : MonoBehaviour
 
         // ✅ 教學結束最後：恢復到進教學前
         RestoreAfterTeaching();
+        PhonePanel.SetActive(false);
 
         photoFrameClicked = false;
 
@@ -685,18 +693,18 @@ public class First : MonoBehaviour
                 dialogueSystemGame00Script.FirstDiaFinished = true;
             }
         }
-        ApplyCheckpointState(SceneCheckpoint.AfterDialogue);
+        //ApplyCheckpointState(SceneCheckpoint.AfterDialogue);
 
         // ---- 到這裡：劇情段結束，切到教學段（先不給跳） ----
-        stage = FlowStage.Teaching;
+        //stage = FlowStage.Teaching;
 
-        Player.SetActive(false);
-        BlackPanel.SetActive(false);
-        cControllScript.playerControlEnabled = false;
-        PhonePanel.SetActive(false);
-        // 5) Teach1
-        // 教學前「標準狀態」統一一下，確保跳過跟乖乖看完一樣
-        ApplyBeforeTeachingState();
+        //Player.SetActive(false);
+        //BlackPanel.SetActive(false);
+        //cControllScript.playerControlEnabled = false;
+        //PhonePanel.SetActive(false);
+        //// 5) Teach1
+        //// 教學前「標準狀態」統一一下，確保跳過跟乖乖看完一樣
+        //ApplyBeforeTeachingState();
 
         //// Teach 1
         //teachRoutine = StartCoroutine(AbnormalTeach_1());
@@ -806,7 +814,17 @@ public class First : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-
+        //如果被請求，且目前沒有教學在跑，就開教學
+        if (requestTeach1)
+        {
+            requestTeach1 = false;
+            StartTeach(AbnormalTeach_1());
+        }
+        else if (requestTeach2)
+        {
+            requestTeach2 = false;
+            StartTeach(AbnormalTeach_2());
+        }
         if (dialogueSystemGame00Script != null && dialogueSystemGame00Script.jumpRequested)
         {
             dialogueSystemGame00Script.jumpRequested = false;
@@ -862,17 +880,7 @@ public class First : MonoBehaviour
             timer.ForceEnd();
             StartCoroutine(ErrorMistake());   // 失敗
         }
-        //如果被請求，且目前沒有教學在跑，就開教學
-        if (requestTeach1)
-        {
-            requestTeach1 = false;
-            StartTeach(AbnormalTeach_1());
-        }
-        else if (requestTeach2)
-        {
-            requestTeach2 = false;
-            StartTeach(AbnormalTeach_2());
-        }
+       
     }
 
     private void StartTeach(IEnumerator teachFlow)
@@ -1027,16 +1035,12 @@ public class First : MonoBehaviour
 
     public void openErrorPanel()
     {
-        if (ErrorPlace != null)
-        {
-            Debug.Log("[First] 顯示異常提示畫面 ErrorPlace");
-            ErrorPlace.SetActive(true);
-            ErrorPanel.SetActive(true);
-            animationScript.Fade(ErrorPanel, 2f, 0f, 1f, null);
-            CirclePlace.SetActive(true);
-            spotManager.RefreshActiveSpots();
-            
-        }
+        Debug.Log("[First] 顯示異常提示畫面 ErrorPlace");
+        ErrorPlace.SetActive(true);
+        ErrorPanel.SetActive(true);
+        animationScript.Fade(ErrorPanel, 2f, 0f, 1f, null);
+        CirclePlace.SetActive(true);
+        spotManager.RefreshActiveSpots();
     }
 
     public void OnCameraButtonClicked()
@@ -1070,15 +1074,18 @@ public class First : MonoBehaviour
     // 燈光閃爍一次（你可自己調節節奏）
     public IEnumerator LightFlickerOnce()
     {
-        if (BusUpLightTotal == null) yield break;
-
         BusUpLightTotal.SetActive(false);
-        yield return new WaitForSeconds(0.06f);
+        yield return new WaitForSeconds(0.05f);
         BusUpLightTotal.SetActive(true);
-        yield return new WaitForSeconds(0.06f);
+        yield return new WaitForSeconds(0.05f);
         BusUpLightTotal.SetActive(false);
-        yield return new WaitForSeconds(0.12f);
+        yield return new WaitForSeconds(0.05f);
         BusUpLightTotal.SetActive(true);
+        yield return new WaitForSeconds(0.05f);
+        BusUpLightTotal.SetActive(false);
+        yield return new WaitForSeconds(0.5f);
+        BusUpLightTotal.SetActive(true);
+        yield return new WaitForSeconds(0.5f);
     }
 
     //// 車子強烈搖晃（最簡單先做相機震動；你也可以改成整台車的 root 在抖）
@@ -1204,7 +1211,48 @@ public class First : MonoBehaviour
     public IEnumerator BigPictureZoom()
     {
         Debug.Log("[First] BigPictureZoom");
-        // TODO: 做放大演出
+        Camera cam = cameraMoveControllScript.cam;
+        if (cam == null || bigPictureTarget == null)
+            yield break;
+
+        // 1️⃣ 記住原本狀態
+        Vector3 camStartPos = cam.transform.position;
+
+        // 計算「往 target 方向前進」
+        Vector3 dir = (bigPictureTarget.position - camStartPos).normalized;
+        Vector3 camZoomPos = camStartPos + dir * zoomDistance;
+
+        float t = 0f;
+
+        // 2️⃣ 推進（Zoom In）
+        while (t < zoomDuration)
+        {
+            t += Time.deltaTime;
+            float lerp = t / zoomDuration;
+            cam.transform.position = Vector3.Lerp(camStartPos, camZoomPos, lerp);
+            yield return null;
+        }
+        cam.transform.position = camZoomPos;
+
+        // 3️⃣ 停留
+        yield return new WaitForSeconds(zoomHoldTime);
+
+        // 4️⃣ 拉回（Zoom Out）
+        t = 0f;
+        while (t < zoomDuration)
+        {
+            t += Time.deltaTime;
+            float lerp = t / zoomDuration;
+            cam.transform.position = Vector3.Lerp(camZoomPos, camStartPos, lerp);
+            yield return null;
+        }
+        cam.transform.position = camStartPos;
+
+        // 5️⃣ 關掉照片 UI
+        if (PhotoPanel != null)
+            PhotoPanel.SetActive(false);
+
+        Debug.Log("[First] BigPictureZoom END");
         yield return new WaitForSeconds(0.8f);
     }
 
@@ -1220,7 +1268,9 @@ public class First : MonoBehaviour
     {
         Debug.Log("[First] ShowGameTitle");
         TitlePanel.SetActive(true);
-        yield return new WaitForSeconds(1.2f);
+        animationScript.Fade(TitlePanel, 1.5f, 0f, 1f, null);
+        yield return new WaitForSeconds(2f);
+        TitlePanel.SetActive(false);
     }
 
     public IEnumerator RunTeach1()
@@ -1228,6 +1278,7 @@ public class First : MonoBehaviour
         ApplyBeforeTeachingState();
         teachRoutine = StartCoroutine(AbnormalTeach_1());
         yield return teachRoutine;
+        PhonePanel.SetActive(false);
         teachRoutine = null;
     }
 
@@ -1236,6 +1287,7 @@ public class First : MonoBehaviour
         ApplyBeforeTeachingState();
         teachRoutine = StartCoroutine(AbnormalTeach_2());
         yield return teachRoutine;
+        PhonePanel.SetActive(false);
         teachRoutine = null;
     }
     private void CaptureBeforeTeaching()

@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using TMPro;
+using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -41,6 +42,8 @@ public class DialogueSystemGame00 : MonoBehaviour
     [Header("腳本")]
     public CControll cControllScript;
     public First firstScript;
+    public AnimationScript animationScript;
+    public SceneChange sceneChangeScript;
 
     public enum LineCode { Player = 0, Action = 1, Narration = 2 }
 
@@ -68,6 +71,7 @@ public class DialogueSystemGame00 : MonoBehaviour
     {
         cControllScript = FindAnyObjectByType<CControll>();
         firstScript = FindAnyObjectByType<First>();
+        animationScript = FindAnyObjectByType<AnimationScript>();
     }
 
     void Start()
@@ -324,6 +328,7 @@ public class DialogueSystemGame00 : MonoBehaviour
             {
                 narraSticky = true;
                 narraAppendMode = true; // 這幾句開始用 append
+                NarraText.text = "";
             }
         }
 
@@ -542,10 +547,13 @@ public class DialogueSystemGame00 : MonoBehaviour
             case "BlackPanelOn":
                 //yield return StartCoroutine(firstScript.fader.FadeExposure(0.1f/*持續時間*/, 0.5f/*起始*/, -10f/*終點*/));
                 firstScript.BlackPanel.SetActive(true);
+                animationScript.Fade(firstScript.BlackPanel, 1f, 0f, 1f, null);
                 break;
 
             case "BlackPanelOff":
                 //yield return StartCoroutine(firstScript.fader.FadeExposure(0.1f/*持續時間*/, 0.5f/*起始*/, -10f/*終點*/));
+                //firstScript.BlackPanel.SetActive(false);
+                animationScript.Fade(firstScript.BlackPanel, 1f, 1f, 0f, null);
                 firstScript.BlackPanel.SetActive(false);
                 break;
 
@@ -634,7 +642,7 @@ public class DialogueSystemGame00 : MonoBehaviour
             // 9) bigpicture：放大照片 target 區塊到指定大小
             case "bigpicture":
                 if (firstScript != null)
-                    yield return firstScript.StartCoroutine(firstScript.BigPictureZoom());
+                    yield return firstScript.BigPictureZoom();
                 break;
 
             // 10) TimeJump_1930：時間改變
@@ -681,11 +689,12 @@ public class DialogueSystemGame00 : MonoBehaviour
 
     private void FinishDialogue()
     {
-        //if (TextfileCurrent == TextfileGame00)
-        //{
-        //    FirstDiaFinished = true;
-        //    allowFastReveal = true;
-        //}
+        if (TextfileCurrent == TextfileGame00)
+        {
+            FirstDiaFinished = true;
+            //allowFastReveal = true;
+            animationScript.Fade(firstScript.BlackPanel,1f,0f,1f, ()=> sceneChangeScript.SceneC("02"));
+        }
         EndDialogue();
     }
 }
