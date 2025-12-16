@@ -43,7 +43,7 @@ LeftAndRight
 1
 PickPhoneOn
 1
-Label_Teach1Start
+Label_MUST_Teach1Start
 1
 InTeach
 1
@@ -83,7 +83,7 @@ BusShake_Strong(車子搖晃)
 0
 要再拍一次嗎……！
 1
-Label_Teach2Start
+Label_MUST_Teach2Start
 1
 Tutorial_AnomalyAppear(進入教學2，教學中，等回到遊戲畫面繼續對話)
 0

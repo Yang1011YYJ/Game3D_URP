@@ -34,6 +34,8 @@ public class DialogueSystemGame00 : MonoBehaviour
     public SceneCheckpoint skipToCP = SceneCheckpoint.Start;
     [Tooltip("允許跳過教學")] public bool allowSkipTeaching = false;
     public Dictionary<string, int> labelToIndex = new Dictionary<string, int>();
+    public bool jumpRequested = false;
+    public SceneCheckpoint jumpTarget = SceneCheckpoint.AfterDialogue;
 
 
     [Header("腳本")]
@@ -137,29 +139,71 @@ public class DialogueSystemGame00 : MonoBehaviour
         return -1;
     }
 
-    public bool SkipToNextMandatoryLabel()
+    public bool SkipByEsc_ToNextMustOrEnd()
     {
+        // 沒對話資料就不處理
         if (TextList == null || TextList.Count == 0) return false;
 
-        int target = FindNextMandatoryLabelIndex(index);
-        if (target < 0)
-        {
-            Debug.Log("[Dialogue] No next mandatory label found, skip ignored.");
-            return false;
-        }
-
-        // 清掉打字與面板，避免殘影
+        // 停掉打字與正在跑的動作（避免卡狀態）
         StopTyping();
         isTyping = false;
         isBusy = false;
+
+        // 找下一個 MUST label
+        int target = FindNextMandatoryLabelIndex(index);
+
+        if (target < 0)
+        {
+            // ✅ 沒有 MUST label：直接視為對話結束
+            index = TextList.Count;     // 讓狀態符合你說的「index==count」
+            FinishDialogue();
+            return true;
+        }
+
+        // ✅ 有 MUST label：跳過去，但別卡在 label 本身
+        // 先把面板收乾淨（避免殘影）
         SetPanels(false, false);
 
         index = target;
 
-        Debug.Log($"[Dialogue] Skip -> index={index} ({TextList[index].content})");
-        SetTextUI(); // 讓它從 label 那行開始繼續跑（通常 label 本身是空動作）
+        // ⭐ 這一步很關鍵：避免停在 Label_ 那行需要再按空白
+        index++;
+
+        // 如果剛好 label 是最後一行（極少，但保險）
+        if (index >= TextList.Count)
+        {
+            FinishDialogue();
+            return true;
+        }
+
+        SetTextUI();  // 從 label 後一行開始繼續跑（例如 InTeach）
         return true;
     }
+
+
+    //public bool SkipToNextMandatoryLabel()
+    //{
+    //    if (TextList == null || TextList.Count == 0) return false;
+
+    //    int target = FindNextMandatoryLabelIndex(index);
+    //    if (target < 0)
+    //    {
+    //        Debug.Log("[Dialogue] No next mandatory label found, skip ignored.");
+    //        return false;
+    //    }
+
+    //    // 清掉打字與面板，避免殘影
+    //    StopTyping();
+    //    isTyping = false;
+    //    isBusy = false;
+    //    SetPanels(false, false);
+
+    //    index = target;
+
+    //    Debug.Log($"[Dialogue] Skip -> index={index} ({TextList[index].content})");
+    //    SetTextUI(); // 讓它從 label 那行開始繼續跑（通常 label 本身是空動作）
+    //    return true;
+    //}
 
 
     // 從外部開始對話（可以指定要播哪個 TextAsset）
@@ -392,15 +436,46 @@ public class DialogueSystemGame00 : MonoBehaviour
 
         var line = TextList[index];
 
-        // 依照目前 code，把文字塞到對的面板
-        if (line.code == LineCode.Narration/*2*/)
+        if (line.code == LineCode.Narration)
         {
-            if (NarraText != null) NarraText.text = line.content;
+            if (NarraText != null)
+            {
+                // ⭐ 關鍵：如果是 append 模式，就「補齊當前這一句」，不要洗掉前文
+                if (narraAppendMode)
+                {
+                    // 如果目前正在打字，target.text 裡已經有「部分字」
+                    // 我們只需要補上「還沒出現的剩餘字」
+                    string current = NarraText.text;
+
+                    // 找出最後一行已經顯示到哪
+                    string[] lines = current.Split('\n');
+                    string lastLine = lines[^1];
+
+                    if (line.content.StartsWith(lastLine))
+                    {
+                        // 補上剩下的部分
+                        string rest = line.content.Substring(lastLine.Length);
+                        NarraText.text += rest;
+                    }
+                    else
+                    {
+                        // 保險：如果狀態怪了，至少不要洗掉前面
+                        NarraText.text += "\n" + line.content;
+                    }
+                }
+                else
+                {
+                    // 非 append（一般旁白）才覆蓋
+                    NarraText.text = line.content;
+                }
+            }
         }
         else
         {
-            if (DiaText != null) DiaText.text = line.content;
+            if (DiaText != null)
+                DiaText.text = line.content;
         }
+
         isTyping = false;
     }
 
@@ -429,6 +504,12 @@ public class DialogueSystemGame00 : MonoBehaviour
     private IEnumerator DispatchAction(string actionText)
     {
         string key = actionText.Trim();
+        int paren = key.IndexOf('(');
+        if (paren >= 0) key = key.Substring(0, paren).Trim();
+
+        if (key.StartsWith("Label_"))
+            yield break;
+
         // TODO：你可以在這裡接動畫、音效、顯示手機 UI、角色移動等
         // 範例：如果文本包含「手機」，就等待 0.8 秒當作演出時間
         switch (key)
@@ -487,15 +568,21 @@ public class DialogueSystemGame00 : MonoBehaviour
 
             case "PickPhoneOn":
                 cControllScript.animator.SetBool("phone", true);
-                yield return StartCoroutine(firstScript.WaitForAnimation(cControllScript.animator, "phone"));
+                yield return firstScript.WaitForAnimation(cControllScript.animator, "phone");
                 firstScript.PhonePanel.SetActive(true);
                 cControllScript.animator.SetBool("phone", false);
                 break;
 
             // 1) WaitForTeach：教學中，等回到遊戲畫面才繼續
             case "WaitForTeach":
-                // 你需要在 First 裡做一個旗標（下面我會告訴你加哪裡）
-                yield return new WaitUntil(() => firstScript.teachRoutine == null);
+                if (firstScript != null)
+                {
+                    // 1) 先等教學真的開始（teachRoutine 變成非 null）
+                    yield return new WaitUntil(() => firstScript.teachRoutine != null);
+
+                    // 2) 再等教學結束（teachRoutine 回到 null）
+                    yield return new WaitUntil(() => firstScript.teachRoutine == null);
+                }
 
                 break;
 
@@ -516,7 +603,7 @@ public class DialogueSystemGame00 : MonoBehaviour
             // 4) LightOn：燈光恢復正常
             case "LightOn":
                 if (firstScript != null && firstScript.fader != null)
-                    yield return firstScript.StartCoroutine(firstScript.fader.FadeExposure(0.8f, -10f, 0.5f));
+                    yield return firstScript.fader.FadeExposure(0.8f, -10f, 0.5f);
                 break;
 
             // 5) LightFlicker：燈光閃爍（你可自己決定閃幾次）
@@ -528,7 +615,7 @@ public class DialogueSystemGame00 : MonoBehaviour
             // 6) LightDimDown：燈光暗下來（曝光 0.5 → -10）
             case "LightDimDown":
                 if (firstScript != null && firstScript.fader != null)
-                    yield return firstScript.StartCoroutine(firstScript.fader.FadeExposure(0.8f, 0.5f, -10f));
+                    yield return firstScript.fader.FadeExposure(0.8f, 0.5f, -10f);
                 break;
 
             // 7) BusShake_Strong：車子搖晃（你做成相機震動或物件晃動）
@@ -565,8 +652,7 @@ public class DialogueSystemGame00 : MonoBehaviour
             case "InTeach":
                 FirstDiaFinished = true;
                 allowFastReveal = true;
-                if (firstScript != null)
-                    yield return firstScript.StartCoroutine(firstScript.RunTeach1());
+                if (firstScript != null) firstScript.RequestTeach1();
                 break;
 
             default:

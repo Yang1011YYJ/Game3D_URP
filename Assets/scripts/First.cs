@@ -23,11 +23,40 @@ public enum SceneCheckpoint
 
 public class First : MonoBehaviour
 {
+    [System.Serializable]
+    private class TeachingSnapshot
+    {
+        public bool playerActive;
+        public bool playerControl;
+
+        public bool phonePanelActive;
+        public bool blackPanelActive;
+
+        public bool errorPanelActive;
+        public bool errorPlaceActive;
+        public bool circlePlaceActive;
+
+        public bool hintActive;
+        public bool photoFrameActive;
+        public bool correctPanelActive;
+        public bool wrongPanelActive;
+        public bool smileActive;
+
+        public bool photoPanelActive;
+        public bool titlePanelActive;
+        public bool timeTextActive;
+
+        public float exposure;         // 需要 fader 提供 getter
+        public Color errorLightColor;
+
+        public Vector3 camPos;
+    }
+    private TeachingSnapshot _teachSnap;
+
     [Header("腳本")]
     public AnimationScript animationScript;
     public CControll cControllScript;
     [Tooltip("場景中負責計算找錯誤數量的管理員")]public SpotManager spotManager;
-    public DialogueSystemGame00 DSG00;
     public TimeControll timer;
     public CameraMoveControll cameraMoveControllScript;
     public FadeInByExposure fader;
@@ -111,9 +140,20 @@ public class First : MonoBehaviour
     [Tooltip("控制紅光閃爍的協程")] Coroutine warningCoroutine;
     [Header("遊戲失敗")]
     [Tooltip("紅色面板")]public GameObject RedPanel;
+    [Tooltip("時間顯示")] public TextMeshProUGUI timetext;
+    [Tooltip("遊戲名稱")] public GameObject TitlePanel;
     [Tooltip("失敗次數")] public int Mistake;
     // 避免重複判定，用一個旗標
     [Tooltip("避免重複判定")]public bool errorResultHandled = false;
+
+    
+
+    public void RequestJump(SceneCheckpoint target)
+    {
+        dialogueSystemGame00Script.jumpRequested = true;
+        dialogueSystemGame00Script.jumpTarget = target;
+    }
+
 
     private enum FlowStage
     {
@@ -141,7 +181,6 @@ public class First : MonoBehaviour
     private void Awake()
     {
         animationScript = GetComponent<AnimationScript>();
-        DSG00 = FindAnyObjectByType<DialogueSystemGame00>();
         timer = FindAnyObjectByType<TimeControll>();
         cameraMoveControllScript = FindAnyObjectByType<CameraMoveControll>();
         fader = FindAnyObjectByType<FadeInByExposure>();
@@ -166,6 +205,9 @@ public class First : MonoBehaviour
         ErrorPlace.SetActive(false);
         //CirclePlaceTeach.SetActive(false);
         CirclePlace.SetActive(false);
+        timetext.gameObject.SetActive(false);
+        TitlePanel.SetActive(false);
+        PhotoPanel.SetActive(false);
         RedPanel.SetActive(false);
         BlackPanel.SetActive(false);
         smileTf.gameObject.SetActive(false);
@@ -266,12 +308,6 @@ public class First : MonoBehaviour
         if (PhonePanel != null) PhonePanel.SetActive(false);
         if (smileTf != null) smileTf.gameObject.SetActive(false);
 
-        // 黑幕一定關（你現在流程是曝光淡入）
-        if (BlackPanel != null) BlackPanel.SetActive(false);
-
-        // 車頂燈：劇情跑完閃爍後是亮的
-        if (BusUpLightTotal != null) BusUpLightTotal.SetActive(true);
-
         // 紅光：一般劇情到 Teach1 結束後應該回到原本（你預設 alpha=0）
         if (ErrorLight != null)
         {
@@ -293,16 +329,6 @@ public class First : MonoBehaviour
 
         // --- 依 checkpoint 決定玩家/控制狀態 ---
         // 在你原本流程：對話後會把玩家藏起來、鎖控制，然後進 Teach1/Teach2
-        if (cp < SceneCheckpoint.AfterTeach2)
-        {
-            if (Player != null) Player.SetActive(false);
-            if (cControllScript != null) cControllScript.playerControlEnabled = false;
-        }
-        else
-        {
-            if (Player != null) Player.SetActive(true);
-            if (cControllScript != null) cControllScript.playerControlEnabled = true;
-        }
 
         dialogueSystemGame00Script.currentCP = cp;
     }
@@ -310,10 +336,8 @@ public class First : MonoBehaviour
 
     IEnumerator AbnormalCaptureFlow(Transform targetTf, bool darkFirst, bool showSmile, float waitSmileSeconds)
     {
-        // 記錄原本狀態（用來恢復）
-        bool playerWasActive = Player != null && Player.activeSelf;
-        bool prevControl = cControllScript != null && cControllScript.playerControlEnabled;
-        float prevAlpha = ErrorLight != null ? ErrorLight.color.a : 0f;
+        // ✅ 進教學第一刻：拍快照（只拍一次，不要每一段都拍）
+        if (_teachSnap == null) CaptureBeforeTeaching();
 
         // 先鎖玩家、藏玩家
         if (Player != null) Player.SetActive(false);
@@ -429,17 +453,8 @@ public class First : MonoBehaviour
         if (ErrorPlace != null) ErrorPlace.SetActive(false);
         if (CirclePlace != null) CirclePlace.SetActive(false);
 
-        //// 光線恢復到進來前的 alpha
-        //if (ErrorLight != null)
-        //    yield return StartCoroutine(AbnormalLight(0.6f, ErrorLight.color.a, prevAlpha));
-
-        //// 第二段暗下來的話，曝光恢復
-        //if (darkFirst)
-        //    yield return StartCoroutine(fader.FadeExposure(1.0f, darkExposure, baseExposure));
-
-        // 玩家回來
-        if (Player != null) Player.SetActive(true);
-        if (cControllScript != null) cControllScript.playerControlEnabled = prevControl;
+        // ✅ 教學結束最後：恢復到進教學前
+        RestoreAfterTeaching();
 
         photoFrameClicked = false;
 
@@ -599,6 +614,7 @@ public class First : MonoBehaviour
         //    BlackPanel.SetActive(false);
         //}
         //yield return StartCoroutine(postExposureFaderScript.FadeExposure(lightUPDuration/*持續時間*/, -3f, 0f));
+        cameraMoveControllScript.cam.transform.position = StartPoint.position;
         // 1) 曝光淡入
         if (!dialogueSystemGame00Script. skipRequested)
         {
@@ -682,19 +698,19 @@ public class First : MonoBehaviour
         // 教學前「標準狀態」統一一下，確保跳過跟乖乖看完一樣
         ApplyBeforeTeachingState();
 
-        // Teach 1
-        teachRoutine = StartCoroutine(AbnormalTeach_1());
-        yield return teachRoutine;
-        teachRoutine = null;
-        ApplyCheckpointState(SceneCheckpoint.AfterTeach1);
+        //// Teach 1
+        //teachRoutine = StartCoroutine(AbnormalTeach_1());
+        //yield return teachRoutine;
+        //teachRoutine = null;
+        //ApplyCheckpointState(SceneCheckpoint.AfterTeach1);
 
-        Debug.Log("中間劇情");
+        //Debug.Log("中間劇情");
 
-        // Teach 2
-        teachRoutine = StartCoroutine(AbnormalTeach_2());
-        yield return teachRoutine;
-        teachRoutine = null;
-        ApplyCheckpointState(SceneCheckpoint.AfterTeach2);
+        //// Teach 2
+        //teachRoutine = StartCoroutine(AbnormalTeach_2());
+        //yield return teachRoutine;
+        //teachRoutine = null;
+        //ApplyCheckpointState(SceneCheckpoint.AfterTeach2);
 
 
         ////2.1紅光亮起
@@ -740,7 +756,7 @@ public class First : MonoBehaviour
         if (PhonePanel != null) PhonePanel.SetActive(false);
 
         // 你的教學流程本來就是先把玩家藏起來並鎖控制
-        if (Player != null) Player.SetActive(false);
+        //if (Player != null) Player.SetActive(false);
         if (cControllScript != null) cControllScript.playerControlEnabled = false;
 
         // 教學 UI 預設收乾淨（避免跳過殘留）
@@ -790,20 +806,39 @@ public class First : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+
+        if (dialogueSystemGame00Script != null && dialogueSystemGame00Script.jumpRequested)
+        {
+            dialogueSystemGame00Script.jumpRequested = false;
+
+            // 依 jumpTarget 對齊狀態
+            ApplyCheckpointState(dialogueSystemGame00Script.jumpTarget);
+
+            // 同步 stage（你自己定義哪些 checkpoint 算 cutscene / teaching）
+            stage = (dialogueSystemGame00Script.jumpTarget <= SceneCheckpoint.AfterDialogue)
+                ? FlowStage.Cutscene
+                : FlowStage.Teaching;
+
+            // 也把對話停掉，避免殘影
+            dialogueSystemGame00Script.StopTyping();
+            dialogueSystemGame00Script.SetPanels(false, false);
+        }
         // 跳過劇情（你也可以改成 UI Button 來呼叫 SkipToTeaching()）
         if (Input.GetKeyDown(KeyCode.Escape))
         {
-            // 只允許劇情段跳過；教學段你想給跳再改條件
-            if (stage == FlowStage.Cutscene)
-            {
-                // 先把教學/面板殘留收乾淨（很重要）
-                ApplyBeforeTeachingState();
+            // 教學段：先不給跳（最穩）
+            if (teachRoutine != null) return;
 
-                // 叫對話系統自己找下一個必到 label
-                dialogueSystemGame00Script.SkipToNextMandatoryLabel();
+            // 劇情段：ESC = 跳到下一個 MUST label，沒有就直接結束對話
+            if (stage == FlowStage.Cutscene && dialogueSystemGame00Script != null)
+            {
+                dialogueSystemGame00Script.SkipByEsc_ToNextMustOrEnd();
                 return;
             }
+
+            // 如果你之後真的要「教學段也能跳」，再在這裡加規則
         }
+
 
         timer.timerText.gameObject.SetActive(ErrorPanel.activeSelf);
         if (spotManager == null) return;
@@ -831,20 +866,24 @@ public class First : MonoBehaviour
         if (requestTeach1)
         {
             requestTeach1 = false;
-            teachRoutine = StartCoroutine(AbnormalTeach_1());
-            StartCoroutine(ClearTeachRoutineWhenDone(teachRoutine));
+            StartTeach(AbnormalTeach_1());
         }
         else if (requestTeach2)
         {
             requestTeach2 = false;
-            teachRoutine = StartCoroutine(AbnormalTeach_2());
-            StartCoroutine(ClearTeachRoutineWhenDone(teachRoutine));
+            StartTeach(AbnormalTeach_2());
         }
     }
 
-    private IEnumerator ClearTeachRoutineWhenDone(Coroutine routine)
+    private void StartTeach(IEnumerator teachFlow)
     {
-        yield return routine;
+        if (teachRoutine != null) StopCoroutine(teachRoutine);
+        teachRoutine = StartCoroutine(TeachWrapper(teachFlow));
+    }
+
+    private IEnumerator TeachWrapper(IEnumerator teachFlow)
+    {
+        yield return StartCoroutine(teachFlow);
         teachRoutine = null;
     }
 
@@ -1173,14 +1212,14 @@ public class First : MonoBehaviour
     public void SetTimeText(string timeText)
     {
         Debug.Log($"[First] TimeJump -> {timeText}");
-        // TODO: timerText 或手機時間欄位改成 timeText
+        timetext.text = timeText;
     }
 
     // 顯示遊戲標題（你可以做一個 TitlePanel）
     public IEnumerator ShowGameTitle()
     {
         Debug.Log("[First] ShowGameTitle");
-        // TODO: TitlePanel.SetActive(true); 淡入淡出
+        TitlePanel.SetActive(true);
         yield return new WaitForSeconds(1.2f);
     }
 
@@ -1198,6 +1237,71 @@ public class First : MonoBehaviour
         teachRoutine = StartCoroutine(AbnormalTeach_2());
         yield return teachRoutine;
         teachRoutine = null;
+    }
+    private void CaptureBeforeTeaching()
+    {
+        _teachSnap = new TeachingSnapshot();
+
+        _teachSnap.playerActive = Player != null && Player.activeSelf;
+        _teachSnap.playerControl = cControllScript != null && cControllScript.playerControlEnabled;
+
+        _teachSnap.phonePanelActive = PhonePanel != null && PhonePanel.activeSelf;
+        _teachSnap.blackPanelActive = BlackPanel != null && BlackPanel.activeSelf;
+
+        _teachSnap.errorPanelActive = ErrorPanel != null && ErrorPanel.activeSelf;
+        _teachSnap.errorPlaceActive = ErrorPlace != null && ErrorPlace.activeSelf;
+        _teachSnap.circlePlaceActive = CirclePlace != null && CirclePlace.activeSelf;
+
+        _teachSnap.hintActive = HintText != null && HintText.gameObject.activeSelf;
+        _teachSnap.photoFrameActive = PhotoFrameImage != null && PhotoFrameImage.gameObject.activeSelf;
+        _teachSnap.correctPanelActive = CorrectPhotoPanel != null && CorrectPhotoPanel.activeSelf;
+        _teachSnap.wrongPanelActive = WrongPhotoPanel != null && WrongPhotoPanel.activeSelf;
+        _teachSnap.smileActive = smileTf != null && smileTf.gameObject.activeSelf;
+
+        _teachSnap.photoPanelActive = PhotoPanel != null && PhotoPanel.activeSelf;
+        _teachSnap.titlePanelActive = TitlePanel != null && TitlePanel.activeSelf;
+        _teachSnap.timeTextActive = timetext != null && timetext.gameObject.activeSelf;
+
+        _teachSnap.errorLightColor = ErrorLight != null ? ErrorLight.color : Color.clear;
+
+        if (cameraMoveControllScript != null && cameraMoveControllScript.cam != null)
+            _teachSnap.camPos = cameraMoveControllScript.cam.transform.position;
+
+        // 曝光：要能「讀」才有辦法存
+        if (fader != null) _teachSnap.exposure = fader.GetExposure(); // 下面我會說 fader 要補什麼
+    }
+    private void RestoreAfterTeaching()
+    {
+        if (_teachSnap == null) return;
+
+        if (Player != null) Player.SetActive(_teachSnap.playerActive);
+        if (cControllScript != null) cControllScript.playerControlEnabled = _teachSnap.playerControl;
+
+        if (PhonePanel != null) PhonePanel.SetActive(_teachSnap.phonePanelActive);
+        if (BlackPanel != null) BlackPanel.SetActive(_teachSnap.blackPanelActive);
+
+        if (ErrorPanel != null) ErrorPanel.SetActive(_teachSnap.errorPanelActive);
+        if (ErrorPlace != null) ErrorPlace.SetActive(_teachSnap.errorPlaceActive);
+        if (CirclePlace != null) CirclePlace.SetActive(_teachSnap.circlePlaceActive);
+
+        if (HintText != null) HintText.gameObject.SetActive(_teachSnap.hintActive);
+        if (PhotoFrameImage != null) PhotoFrameImage.gameObject.SetActive(_teachSnap.photoFrameActive);
+        if (CorrectPhotoPanel != null) CorrectPhotoPanel.SetActive(_teachSnap.correctPanelActive);
+        if (WrongPhotoPanel != null) WrongPhotoPanel.SetActive(_teachSnap.wrongPanelActive);
+        if (smileTf != null) smileTf.gameObject.SetActive(_teachSnap.smileActive);
+
+        if (PhotoPanel != null) PhotoPanel.SetActive(_teachSnap.photoPanelActive);
+        if (TitlePanel != null) TitlePanel.SetActive(_teachSnap.titlePanelActive);
+        if (timetext != null) timetext.gameObject.SetActive(_teachSnap.timeTextActive);
+
+        if (ErrorLight != null) ErrorLight.color = _teachSnap.errorLightColor;
+
+        if (cameraMoveControllScript != null && cameraMoveControllScript.cam != null)
+            cameraMoveControllScript.cam.transform.position = _teachSnap.camPos;
+
+        if (fader != null) fader.SetExposureImmediate(_teachSnap.exposure);
+
+        _teachSnap = null;
     }
 
 }

@@ -44,4 +44,10 @@ public class FadeInByExposure : MonoBehaviour
 
         ca.postExposure.value = value;
     }
+    public float GetExposure()
+    {
+        if (ca == null) Cache();
+        if (ca == null) return 0f; // 取不到就回傳 0，避免爆炸
+        return ca.postExposure.value;
+    }
 }
