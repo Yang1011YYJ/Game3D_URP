@@ -30,18 +30,16 @@ public class DialogueSystemGame00 : MonoBehaviour
     public CControll cControllScript;
     public First firstScript;
 
+    public enum LineCode { Player = 0, Action = 1, Narration = 2 }
+
     // ---- 內部資料結構：每一句 = (code, content)
     public struct DialogueEntry
     {
-        public int code;      // 0 玩家, 1 動作, 2 旁白
+        public LineCode code;// 0 玩家, 1 動作, 2 旁白
         public string content;
-
-        public DialogueEntry(int c, string t)
-        {
-            code = c;
-            content = t;
-        }
+        public DialogueEntry(LineCode c, string t) { code = c; content = t; }
     }
+
 
     [Header("內部狀態")]// 
     public List<DialogueEntry> TextList = new List<DialogueEntry>();
@@ -58,49 +56,39 @@ public class DialogueSystemGame00 : MonoBehaviour
 
     void Start()
     {
-        if (TextPanel) TextPanel.SetActive(false);
-        if (NarraTextPanel) NarraTextPanel.SetActive(false);
+        SetPanels(false, false);
     }
 
     void Update()
     {
         // 有動作在跑就先不吃空白（避免玩家硬切）
         if (isBusy) return;
+        if (!anyPanelOn()) return;
 
-        // 兩個面板都沒開就不處理
-        bool anyPanelOn =
-            (TextPanel != null && TextPanel.activeSelf) ||
-            (NarraTextPanel != null && NarraTextPanel.activeSelf);
+        //// 兩個面板都沒開就不處理
+        //bool anyPanelOn =
+        //    (TextPanel != null && TextPanel.activeSelf) ||
+        //    (NarraTextPanel != null && NarraTextPanel.activeSelf);
 
-        if (!anyPanelOn) return;
+        if (!Input.GetKeyDown(KeyCode.Space)) return;
 
-        if (Input.GetKeyDown(KeyCode.Space))
+        if (isTyping)
         {
-            if (isTyping)
-            {
-                // 正在打字 → 直接補完這一行
-                // 打字中：允許才快顯
-                if (allowFastReveal)
-                    FinishCurrentLineImmediately();
-            }
-            else
-            {
-                // 這一行已經打完 → 換下一行或關閉
-                index++;
-
-                if (index >= TextList.Count)
-                {
-                    if(TextfileCurrent == TextfileGame00)
-                    {
-                        EndDialogue();
-                    }
-                }
-                else
-                {
-                    SetTextUI();
-                }
-            }
+            if (allowFastReveal) FinishCurrentLineImmediately();
+            return;
         }
+
+        index++;
+        if (index >= TextList.Count)
+        {
+            if (TextfileCurrent == TextfileGame00)
+            {
+                EndDialogue();
+            }
+            return;
+        }
+
+        SetTextUI();
     }
 
     //// 從 TextAsset 讀進所有行
@@ -123,7 +111,7 @@ public class DialogueSystemGame00 : MonoBehaviour
     // 從外部開始對話（可以指定要播哪個 TextAsset）
     public void StartDialogue(TextAsset textAsset)
     {
-        if (textAsset == null)
+        if (!textAsset)
         {
             Debug.LogWarning("[DialogueSystemGame00] StartDialogue textAsset is null");
             return;
@@ -149,7 +137,7 @@ public class DialogueSystemGame00 : MonoBehaviour
         index = 0;
 
         string[] lines = file.text.Split('\n');
-        List<string> cleaned = new List<string>();
+        List<string> cleaned = new();
 
         foreach (var l in lines)
         {
@@ -160,29 +148,23 @@ public class DialogueSystemGame00 : MonoBehaviour
 
         // 必須是偶數行：code, content, code, content...
         if (cleaned.Count % 2 != 0)
-        {
             Debug.LogWarning("[DialogueSystemGame00] 文本行數不是偶數，最後一行可能缺 content。會忽略最後一行。");
-        }
 
         for (int i = 0; i + 1 < cleaned.Count; i += 2)
         {
-            int code = 0;
-            if (!int.TryParse(cleaned[i], out code))
+            if (!int.TryParse(cleaned[i], out int raw))
             {
                 Debug.LogWarning($"[DialogueSystemGame00] 第 {i} 行代碼不是數字：{cleaned[i]}，預設當 0");
-                code = 0;
+                raw = 0;
             }
 
-            string content = cleaned[i + 1];
-            TextList.Add(new DialogueEntry(code, content));
+            var code = (LineCode)Mathf.Clamp(raw, 0, 2);
+            TextList.Add(new DialogueEntry(code, cleaned[i + 1]));
         }
     }
 
-    // 顯示 index 對應的那一行，啟動打字機效果
-    void SetTextUI()
+    public void StopTyping()
     {
-        if (index < 0 || index >= TextList.Count) { EndDialogue(); return; }
-
         // 保險：停掉上一句打字
         if (typingRoutine != null)
         {
@@ -190,31 +172,31 @@ public class DialogueSystemGame00 : MonoBehaviour
             typingRoutine = null;
         }
         isTyping = false;
+    }
 
-        DialogueEntry line = TextList[index];
+    // 顯示 index 對應的那一行，啟動打字機效果
+    void SetTextUI()
+    {
+        Debug.Log($"[Dialogue] index={index}, code={TextList[index].code}, content={TextList[index].content}");
+
+        if (index < 0 || index >= TextList.Count) { EndDialogue(); return; }
+
+        StopTyping();
+
+        var line = TextList[index];
 
         switch (line.code)
         {
-            case 0: // 玩家對話
-                ShowPlayerPanel();
-                typingRoutine = StartCoroutine(TypeLine(DiaText, line.content));
+            case LineCode.Player/*0*/: // 玩家對話
+                ShowLineOnPlayer(line.content);
                 break;
 
-            case 2: // 旁白
-                ShowNarrationPanel();
-                if (NarraText == null)
-                {
-                    Debug.LogWarning("[DialogueSystemGame00] NarraText 沒有指定，旁白不會顯示文字");
-                }
-                else
-                {
-                    typingRoutine = StartCoroutine(TypeLine(NarraText, line.content));
-                }
+            case LineCode.Narration/*2*/: // 旁白
+                ShowLineOnNarration(line.content);
                 break;
 
-            case 1: // 動作（做完自動下一句）
-                if (TextPanel) TextPanel.SetActive(false);
-                if (NarraTextPanel) NarraTextPanel.SetActive(false);
+            case LineCode.Action/*1*/: // 動作（做完自動下一句）
+                SetPanels(false, false);
                 StartCoroutine(DoActionThenContinue(line.content));
                 break;
 
@@ -243,34 +225,42 @@ public class DialogueSystemGame00 : MonoBehaviour
         typingRoutine = null;
     }
 
-    private void ShowPlayerPanel()
+    // ---- 顯示/打字：集中處理，避免到處寫一樣的 code ----
+    private void ShowLineOnPlayer(string content)
     {
-        if (TextPanel) TextPanel.SetActive(true);
-        if (NarraTextPanel) NarraTextPanel.SetActive(false);
+        SetPanels(true, false);
+        typingRoutine = StartCoroutine(TypeLine(DiaText, content));
     }
 
-    private void ShowNarrationPanel()
+    private void ShowLineOnNarration(string content)
     {
-        if (TextPanel) TextPanel.SetActive(false);
-        if (NarraTextPanel) NarraTextPanel.SetActive(true);
+        SetPanels(false, true);
+        if (!NarraText)
+        {
+            Debug.LogWarning("[DialogueSystemGame00] NarraText 沒指定，旁白不顯示。");
+            return;
+        }
+        typingRoutine = StartCoroutine(TypeLine(NarraText, content));
+    }
+
+    public void SetPanels(bool playerOn, bool narraOn)
+    {
+        if (TextPanel) TextPanel.SetActive(playerOn);
+        if (NarraTextPanel) NarraTextPanel.SetActive(narraOn);
     }
 
     // 正在打字時按 Space：立刻把這一行顯示完整
     void FinishCurrentLineImmediately()
     {
 
-        if (typingRoutine != null)
-        {
-            StopCoroutine(typingRoutine);
-            typingRoutine = null;
-        }
+        StopTyping();
 
         if (index < 0 || index >= TextList.Count) return;
 
-        DialogueEntry line = TextList[index];
+        var line = TextList[index];
 
         // 依照目前 code，把文字塞到對的面板
-        if (line.code == 2)
+        if (line.code == LineCode.Narration/*2*/)
         {
             if (NarraText != null) NarraText.text = line.content;
         }
@@ -278,7 +268,6 @@ public class DialogueSystemGame00 : MonoBehaviour
         {
             if (DiaText != null) DiaText.text = line.content;
         }
-
         isTyping = false;
     }
 
@@ -320,20 +309,21 @@ public class DialogueSystemGame00 : MonoBehaviour
         }
     }
 
+    // ---- 面板/結束 ----
+    private bool anyPanelOn()
+    {
+        return (TextPanel && TextPanel.activeSelf) || (NarraTextPanel && NarraTextPanel.activeSelf);
+    }
+
     private void EndDialogue()
     {
-        if (TextPanel) TextPanel.SetActive(false);
-        if (NarraTextPanel) NarraTextPanel.SetActive(false);
+        SetPanels(false, false);
 
         index = 0;
         isTyping = false;
         isBusy = false;
 
-        if (typingRoutine != null)
-        {
-            StopCoroutine(typingRoutine);
-            typingRoutine = null;
-        }
+        StopTyping();
     }
 
 
