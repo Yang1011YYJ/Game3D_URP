@@ -15,6 +15,7 @@ public class CControll : MonoBehaviour
     [Tooltip("坐著睡著")] public AnimationClip sitsleep;
     [Tooltip("抓頭")] public AnimationClip Catch;
     [Tooltip("閉眼")] public AnimationClip eyeclose;
+    [Tooltip("面相左邊")] public Sprite leftidle;
 
     [Header("角色外表")]
     public SpriteRenderer spriteRenderer;

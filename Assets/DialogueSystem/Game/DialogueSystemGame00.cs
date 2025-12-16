@@ -295,17 +295,63 @@ public class DialogueSystemGame00 : MonoBehaviour
 
     private IEnumerator DispatchAction(string actionText)
     {
+        string key = actionText.Trim();
         // TODO：你可以在這裡接動畫、音效、顯示手機 UI、角色移動等
         // 範例：如果文本包含「手機」，就等待 0.8 秒當作演出時間
-        if (actionText.Contains("PickPhone"))
+        switch (key)
         {
-            cControllScript.animator.SetBool("phone", true);
-            yield return StartCoroutine(firstScript.WaitForAnimation(cControllScript.animator, "phone"));
-        }
-        else
-        {
-            // 預設動作時間（避免瞬間跳過看不到）
-            yield return new WaitForSeconds(0.5f);
+            case "PickPhone":
+                cControllScript.animator.SetBool("phone", true);
+                yield return StartCoroutine(firstScript.WaitForAnimation(cControllScript.animator, "phone"));
+                firstScript.PhonePanel.SetActive(true);
+                yield return new WaitForSeconds(2f);
+                firstScript.PhonePanel.SetActive(false);
+                break;
+
+            case "WalkToFront":
+                cControllScript.Target = new Vector2();
+                cControllScript.autoMoveFinished = false;
+                cControllScript.animator.SetBool("walk", true);
+                cControllScript.isAutoMoving = true;
+                yield return new WaitUntil(() => cControllScript.autoMoveFinished);
+
+                cControllScript.animator.SetBool("walk", false);
+                break;
+
+            case "eyeclose":
+                cControllScript.animator.SetBool("eyeclose", true);
+                yield return new WaitForSeconds(3f);
+                cControllScript.animator.SetBool("eyeclose", false);
+                break;
+
+            case "LightOff":
+                yield return StartCoroutine(firstScript.fader.FadeExposure(0.1f/*持續時間*/, 0.5f/*起始*/, -10f/*終點*/));
+                break;
+
+            case "LeftAndRight":
+                cControllScript.GetComponent<SpriteRenderer>().sprite = cControllScript.leftidle;
+                yield return new WaitForSeconds(0.5f);
+                cControllScript.GetComponent<SpriteRenderer>().flipX = true;//面向右邊
+                yield return new WaitForSeconds(0.5f);
+                cControllScript.GetComponent<SpriteRenderer>().flipX = false;//面向左邊
+                yield return new WaitForSeconds(0.5f);
+                cControllScript.GetComponent<SpriteRenderer>().flipX = true;//面向右邊
+                yield return new WaitForSeconds(0.5f);
+                cControllScript.GetComponent<SpriteRenderer>().flipX = false;//面向左邊
+                break;
+
+            case "PhoneOn":
+                firstScript.PhonePanel.SetActive(true);
+                break;
+
+            case "PickPhoneOn":
+                cControllScript.animator.SetBool("phone", true);
+                yield return StartCoroutine(firstScript.WaitForAnimation(cControllScript.animator, "phone"));
+                firstScript.PhonePanel.SetActive(true);
+                break;
+
+            default:
+                break;
         }
     }
 

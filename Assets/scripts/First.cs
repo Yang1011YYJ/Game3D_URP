@@ -15,6 +15,8 @@ public class First : MonoBehaviour
     public DialogueSystemGame00 DSG00;
     public TimeControll timer;
     public CameraMoveControll cameraMoveControllScript;
+    public FadeInByExposure fader;
+    public DialogueSystemGame00 dialogueSystemGame00Script;
 
     [Header("異常相關")]
     [Tooltip("異常畫面的背景")]public GameObject ErrorPanel;
@@ -31,12 +33,17 @@ public class First : MonoBehaviour
     [Header("玩家")]
     public GameObject Player;
     [Tooltip("玩家教學用自動走到的位置")]public Vector2 teachTargetPos = new Vector2(19.3f, -4.3f);
+    public Transform targetPoint;
+
 
     [Header("相機")]
     public Vector3 CurrentPos;
     public Vector3 TargetPos;
     public float MoveSpeed =5f;
-    public float lightUPDuration = 1.2f; 
+    public float lightUPDuration = 1.2f;
+
+    [Header("燈光")]
+    public GameObject BusUpLightTotal;
 
     [Header("教學")]
     [Tooltip("查看教學")] public bool CheckTeach = false;
@@ -64,6 +71,8 @@ public class First : MonoBehaviour
         DSG00 = FindAnyObjectByType<DialogueSystemGame00>();
         timer = FindAnyObjectByType<TimeControll>();
         cameraMoveControllScript = FindAnyObjectByType<CameraMoveControll>();
+        fader = FindAnyObjectByType<FadeInByExposure>();
+        dialogueSystemGame00Script = FindAnyObjectByType<DialogueSystemGame00>();
         if (cControllScript == null)
         {
             cControllScript = FindAnyObjectByType<CControll>();
@@ -80,6 +89,7 @@ public class First : MonoBehaviour
         //CirclePlaceTeach.SetActive(false);
         ErrorPlaceTeach.SetActive(false);
         RedPanel.SetActive(false);
+        BusUpLightTotal.SetActive(true);
         ErrorLight.color = new Color(1, 0, 0, 0);
 
         if (PhonePanel != null)
@@ -113,6 +123,8 @@ public class First : MonoBehaviour
         //    BlackPanel.SetActive(false);
         //}
         //yield return StartCoroutine(postExposureFaderScript.FadeExposure(lightUPDuration/*持續時間*/, -3f, 0f));
+        yield return StartCoroutine(fader.FadeExposure(1.5f/*持續時間*/, -10f/*起始*/, 0.5f/*終點*/));
+        yield return new WaitForSeconds(2);
 
 
         // 2. 鏡頭回到公車內（先把鏡頭放在起點，再移到目標）
@@ -120,7 +132,20 @@ public class First : MonoBehaviour
         yield return StartCoroutine(cameraMoveControllScript.MoveCameraTo(TargetPos, MoveSpeed));
 
         //3.車頂燈光閃爍
+        BusUpLightTotal.SetActive(false);
+        yield return new WaitForSeconds(0.2f);
+        BusUpLightTotal.SetActive(true);
+        yield return new WaitForSeconds(0.2f);
+        BusUpLightTotal.SetActive(false);
+        yield return new WaitForSeconds(0.2f);
+        BusUpLightTotal.SetActive(true);
+        yield return new WaitForSeconds(0.2f);
+        BusUpLightTotal.SetActive(false);
+        yield return new WaitForSeconds(2f);
+        BusUpLightTotal.SetActive(true);
 
+        //4.對話開始
+        dialogueSystemGame00Script.StartDialogue(dialogueSystemGame00Script.TextfileGame00);
 
         //2.1紅光亮起
         redLight();

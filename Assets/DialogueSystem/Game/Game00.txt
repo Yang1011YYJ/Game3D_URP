@@ -14,6 +14,8 @@ PickPhone
 除了引擎運轉的聲音外，一點雜音都沒有，整個環境安靜得嚇人。
 0
 司機呢......？
+1
+WalkToFront
 2
 駕駛座是空的，但方向盤在自己轉動，公車依然平穩、緩慢的在未知的道路上前進......
 0
@@ -28,11 +30,15 @@ PickPhone
 eyeclose
 0
 該不會是我眼花了......
+1
+LightOff
 0
 ？！
 1
-eyeclose
+LeftAndRight
 0
 怎麼回事......
 0
 手機怎麼自己......
+1
+PickPhoneOn
