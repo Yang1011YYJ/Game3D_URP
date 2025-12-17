@@ -44,9 +44,6 @@ TagManager:
   - name: errorPanel
     uniqueID: 4111771091
     locked: 0
-  - name: errorPlace
-    uniqueID: 2179302129
-    locked: 0
   - name: CircleLayer
     uniqueID: 1613012587
     locked: 0
@@ -55,4 +52,7 @@ TagManager:
     locked: 0
   - name: UI
     uniqueID: 2257921981
+    locked: 0
+  - name: errorPlace
+    uniqueID: 2179302129
     locked: 0

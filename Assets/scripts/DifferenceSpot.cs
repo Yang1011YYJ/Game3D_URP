@@ -6,42 +6,47 @@ using UnityEngine.UI;
 public class DifferenceSpot : MonoBehaviour
 {
     [Header("圈圈預置物")]
-    public GameObject circlePrefab;      // 指到 CircleMark.prefab
-    [Tooltip("圈圈要放在哪個 UI 爸爸下面")]public RectTransform canvasRect;     // 通常拖 Canvas 或 CircleLayer
+    public GameObject circlePrefab;
+    [Tooltip("圈圈要放在哪個 UI 爸爸下面")] public RectTransform canvasRect;
+
+    [Header("回合判定")]
+    public bool requireInFrame = true;    // 需要拍照框罩住才算
+
     bool found = false;
+
     [Tooltip("計算圈圈數量")]
-    public SpotManager manager;          // 由 Manager 幫你塞進來
+    public SpotManager manager;
+    public Second second;                 // 由 Second/Manager 綁進來
 
     public void OnClickSpot()
     {
         if (found) return;
+
+        // ✅ 需要框內才算
+        if (requireInFrame && second != null)
+        {
+            if (!second.IsSpotInsideFrame(this))
+            {
+                second.ConsumeLife("沒對準！");
+                return;
+            }
+        }
+
         found = true;
 
-        
-        GameObject circle = Instantiate(circlePrefab, canvasRect);// 生成圈圈在點的位置
-        // 把圈圈的位置對齊這個 Spot
-        var spotRect = GetComponent<RectTransform>();
-        var circleRect = circle.GetComponent<RectTransform>();
-        circleRect.anchoredPosition = spotRect.anchoredPosition;
+        // ✅ 找到後鎖住按鈕避免重複點
+        var btn = GetComponent<Button>();
+        if (btn != null) btn.interactable = false;
 
-        // 播圈圈填滿動畫
-        var filler = circle.GetComponent<CircleFill>();
-        if (filler != null)
-        {
-            filler.Play();
-        }
+        // 通知統計
+        if (manager != null) manager.OnSpotFound(this);
 
-        // ? 告訴管理員：我被找到囉
-        if (manager != null)
-        {
-            manager.OnSpotFound(this);
-        }
+        // 觸發「閃光+文字+可能結束」
+        if (second != null) second.OnSpotCaptured(this);
     }
 
-    // 👇 如果之後有要重複使用同一個 spot，可以呼叫這個還原
     public void ResetSpot()
     {
         found = false;
     }
 }
-

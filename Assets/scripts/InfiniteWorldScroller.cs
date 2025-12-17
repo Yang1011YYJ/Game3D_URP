@@ -28,6 +28,8 @@ public class WorldScroller : MonoBehaviour
     [Header("無限場景（方案二：一個 Segment = 地板+背景 的組合 Prefab）")]
     [Tooltip("你的 segment prefab，內含 Floor+BG（兩塊都放同一個 prefab 裡）")]
     public GameObject segmentPrefab;
+    [Tooltip("安全段數")] int keepSegmentCount = 3;
+    [SerializeField] float despawnWorldX = 5.5f; // 右側安全刪除線
 
     [Tooltip("場景上現在已經擺好的 segment（從左到右排序）")]
     public List<Transform> segments = new();
@@ -63,7 +65,7 @@ public class WorldScroller : MonoBehaviour
     {
         // 1) 世界移動（只讓這支腳本控制）
         TickMove();
-        TickInfiniteSegments();
+        //TickInfiniteSegments();
 
         // 2) 無限場景維護（生成/移除）
         TickInfiniteSegments();
@@ -139,58 +141,58 @@ public class WorldScroller : MonoBehaviour
     {
         if (segmentPrefab == null) return;
         if (segments == null || segments.Count == 0) return;
-        if (targetCamera == null) return;
         if (segmentWidth <= 0.001f) ResolveSegmentWidth();
 
-        // 以相機的 viewport 右/左邊界換算世界座標
-        float camZ = Mathf.Abs(targetCamera.transform.position.z - worldRoot.position.z);
-        Vector3 rightWorld = targetCamera.ViewportToWorldPoint(new Vector3(1f, 0.5f, camZ));
-        Vector3 leftWorld = targetCamera.ViewportToWorldPoint(new Vector3(0f, 0.5f, camZ));
-
-        // 取得目前最右段、最左段的 bounds（用 Renderer bounds，比你手算可靠）
-        Transform rightSeg = segments[segments.Count - 1];
-        Transform leftSeg = segments[0];
-
-        Bounds rightB = GetBounds(rightSeg);
-        Bounds leftB = GetBounds(leftSeg);
-
-        // 1) 右邊快露底 → 在最右邊生成一段
-        if (rightB.max.x < rightWorld.x + spawnBuffer)
+        // ✅ 右邊：清掉太遠的段（世界往右推會把右邊推走）
+        if (segments.Count > 0 && ShouldDespawnRight(segments[^1]))
         {
-            SpawnToRightOf(rightSeg);
+            DespawnRightMost();
         }
 
-        // 2) 左邊整段超出畫面太多 → 移除最左段
-        if (leftB.max.x < leftWorld.x - despawnBuffer)
+        // ✅ 左邊：補到固定段數
+        while (segments.Count < keepSegmentCount)
         {
-            DespawnLeftMost();
+            SpawnToLeftOf(segments[0]);
         }
     }
-
-    void SpawnToRightOf(Transform baseSeg)
+    bool ShouldDespawnRight(Transform seg)
     {
-        if (segmentPrefab == null) return;
-
-        GameObject go = Instantiate(segmentPrefab, worldRoot);
-        Transform t = go.transform;
-
-        // 放到 baseSeg 的右邊
-        Bounds b = GetBounds(baseSeg);
-        Vector3 pos = t.position;
-        pos.x = b.max.x + (segmentWidth * 0.5f);
-        t.position = pos;
-
-        segments.Add(t);
+        return GetBounds(seg).min.x > despawnWorldX;
     }
 
-    void DespawnLeftMost()
+    void SpawnToLeftOf(Transform baseSeg)
+    {
+        GameObject go = Instantiate(segmentPrefab);
+        Transform t = go.transform;
+        t.SetParent(worldRoot, true);
+
+        Bounds baseB = GetBounds(baseSeg);
+        Bounds newB = GetBounds(t);
+
+        // 讓 newSeg 的 max.x 貼到 baseSeg 的 min.x
+        float dx = baseB.min.x - newB.max.x;
+
+        // y/z 對齊
+        float dy = baseSeg.position.y - t.position.y;
+        float dz = baseSeg.position.z - t.position.z;
+
+        t.position += new Vector3(dx, dy, dz);
+
+        // 因為是最左邊補，所以插到 List 的最前面
+        segments.Insert(0, t);
+    }
+
+
+    void DespawnRightMost()
     {
         if (segments.Count <= 1) return;
 
-        Transform left = segments[0];
-        segments.RemoveAt(0);
-        if (left != null) Destroy(left.gameObject);
+        int last = segments.Count - 1;
+        Transform right = segments[last];
+        segments.RemoveAt(last);
+        if (right != null) Destroy(right.gameObject);
     }
+
 
     // =========================
     // 工具：自動算寬 / bounds

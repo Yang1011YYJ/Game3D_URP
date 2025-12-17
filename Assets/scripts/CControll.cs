@@ -1,46 +1,46 @@
-using System.Collections;
+ï»¿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
 
 public class CControll : MonoBehaviour
 {
-    [Header("°Êµe")]
+    [Header("å‹•ç•«")]
     public Animator animator;
     public Sprite idle;
-    [Tooltip("¬İ¤â¾÷")]public AnimationClip phone;
-    [Tooltip("¨«¸ô")] public AnimationClip walk;
-    [Tooltip("Âà¨­")] public AnimationClip turn;
-    [Tooltip("¹CÀ¸¥¢±Ñ")] public AnimationClip die;
-    [Tooltip("§¤µÛºÎµÛ")] public AnimationClip sitsleep;
-    [Tooltip("§ìÀY")] public AnimationClip Catch;
-    [Tooltip("³¬²´")] public AnimationClip eyeclose;
-    [Tooltip("­±¬Û¥ªÃä")] public Sprite leftidle;
-    [Tooltip("­±¥ªªº¬İ¤â¾÷sprite")] public Sprite leftphoneidle;
+    [Tooltip("çœ‹æ‰‹æ©Ÿ")]public AnimationClip phone;
+    [Tooltip("èµ°è·¯")] public AnimationClip walk;
+    [Tooltip("è½‰èº«")] public AnimationClip turn;
+    [Tooltip("éŠæˆ²å¤±æ•—")] public AnimationClip die;
+    [Tooltip("åè‘—ç¡è‘—")] public AnimationClip sitsleep;
+    [Tooltip("æŠ“é ­")] public AnimationClip Catch;
+    [Tooltip("é–‰çœ¼")] public AnimationClip eyeclose;
+    [Tooltip("é¢ç›¸å·¦é‚Š")] public Sprite leftidle;
+    [Tooltip("é¢å·¦çš„çœ‹æ‰‹æ©Ÿsprite")] public Sprite leftphoneidle;
 
-    [Header("¨¤¦â¥~ªí")]
+    [Header("è§’è‰²å¤–è¡¨")]
     public GameObject PlayerAniAndSprite;
     public SpriteRenderer spriteRenderer;
 
-    [Header("¬Û¾÷")]
+    [Header("ç›¸æ©Ÿ")]
     public Camera targetCamera;
-    [Tooltip("Âê©wX¡GÁ×§K¤W¤U¥õ­Á¡]±`¥Î¡^")] public bool lockX = false; // Âê©wX¡GÁ×§K¤W¤U¥õ­Á¡]±`¥Î¡^
-    [Tooltip("Âê©wY¡GÁ×§K¤W¤U¥õ­Á¡]±`¥Î¡^")] public bool lockY = false;
-    [Tooltip("Âê©wZ¡GÁ×§K¤W¤U¥õ­Á¡]±`¥Î¡^")] public bool lockZ = false;
+    [Tooltip("é–å®šXï¼šé¿å…ä¸Šä¸‹ä»°ä¿¯ï¼ˆå¸¸ç”¨ï¼‰")] public bool lockX = false; // é–å®šXï¼šé¿å…ä¸Šä¸‹ä»°ä¿¯ï¼ˆå¸¸ç”¨ï¼‰
+    [Tooltip("é–å®šYï¼šé¿å…ä¸Šä¸‹ä»°ä¿¯ï¼ˆå¸¸ç”¨ï¼‰")] public bool lockY = false;
+    [Tooltip("é–å®šZï¼šé¿å…ä¸Šä¸‹ä»°ä¿¯ï¼ˆå¸¸ç”¨ï¼‰")] public bool lockZ = false;
 
     public Rigidbody rig;
 
-    [Header("²¾°Ê°Ñ¼Æ")]
+    [Header("ç§»å‹•åƒæ•¸")]
     public float moveSpeed = 5f;
     public float maxSpeed = 10f;
-    [Tooltip("true = ª±®a¥i¥H¥Î¤è¦VÁä±±¨î")]public bool playerControlEnabled = true;
-    [Tooltip("¬O§_¥¿¦b¦Û°Ê²¾°Ê")]public bool isAutoMoving = false;
-    [Tooltip("¦Û°Ê²¾°Êªº¥Ø¼Ğ®y¼Ğ")] public Vector2 Target;
-    [Tooltip("§P©w©è¹F¥Ø¼Ğªº®e³\»~®t")]public float arriveThreshold = 0.2f;
-    [Tooltip("¦Û°Ê²¾°Ê¬O§_µ²§ô¡]µ¹¥~³¡¬d¸ß¥Î¡^")]public bool autoMoveFinished = false;
-    float x; // ³Ì«á¹ê»Ú®³¥h²¾°Ê¥Îªº¿é¤J­È
+    [Tooltip("true = ç©å®¶å¯ä»¥ç”¨æ–¹å‘éµæ§åˆ¶")]public bool playerControlEnabled = true;
+    [Tooltip("æ˜¯å¦æ­£åœ¨è‡ªå‹•ç§»å‹•")]public bool isAutoMoving = false;
+    [Tooltip("è‡ªå‹•ç§»å‹•çš„ç›®æ¨™åº§æ¨™")] public Vector3 Target3D;
+    [Tooltip("åˆ¤å®šæŠµé”ç›®æ¨™çš„å®¹è¨±èª¤å·®")]public float arriveThreshold = 0.2f;
+    [Tooltip("è‡ªå‹•ç§»å‹•æ˜¯å¦çµæŸï¼ˆçµ¦å¤–éƒ¨æŸ¥è©¢ç”¨ï¼‰")]public bool autoMoveFinished = false;
+    float x; // æœ€å¾Œå¯¦éš›æ‹¿å»ç§»å‹•ç”¨çš„è¼¸å…¥å€¼
 
-    [Header("¸}¥»")]
+    [Header("è…³æœ¬")]
     public First firstScript;
 
     void Awake()
@@ -85,7 +85,7 @@ public class CControll : MonoBehaviour
 
         Vector3 camForward = targetCamera.transform.forward;
 
-        // ¦pªG§A·Q­n¡u¥u¦b¤ô¥­­±Âà¡v¡]¹³¯¸¦b¦a¤W¡^¡A§ï¥Î¡G
+        // å¦‚æœä½ æƒ³è¦ã€Œåªåœ¨æ°´å¹³é¢è½‰ã€ï¼ˆåƒç«™åœ¨åœ°ä¸Šï¼‰ï¼Œæ”¹ç”¨ï¼š
         camForward = Vector3.ProjectOnPlane(camForward, Vector3.up);
 
         Quaternion rot = Quaternion.LookRotation(camForward, Vector3.up);
@@ -101,56 +101,54 @@ public class CControll : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        // ¹w³]¬° 0¡AÁ×§K´İ¯d
+        // é è¨­ç‚º 0ï¼Œé¿å…æ®˜ç•™
         x = 0f;
 
         if (isAutoMoving)
         {
-            float diff = Target.x - transform.position.x;
+            float diff = Target3D.x - rig.position.x;
 
-            // ¦pªGÂ÷¥Ø¼Ğ«Üªñ¡A´Nºâ©è¹F
+            // å¦‚æœé›¢ç›®æ¨™å¾ˆè¿‘ï¼Œå°±ç®—æŠµé”
             if (Mathf.Abs(diff) <= arriveThreshold)
             {
-                Debug.Log("Â÷¥Ø¼Ğ«Üªñ¡Aºâ©è¹F");
-                // °±¤U¨Ó
-                x = 0f;
+                Debug.Log("é›¢ç›®æ¨™å¾ˆè¿‘ï¼Œç®—æŠµé”");
+                // åœä¸‹ä¾†
                 isAutoMoving = false;
                 autoMoveFinished = true;
 
-                // §â®y¼Ğ­×¥¿¨ì¥Ø¼Ğ¡]Á×§Kª«²z®Ì¤@¤U¡^
-                Vector3 pos = transform.position;
-                pos.x = Target.x;
-                transform.position = pos;
-                // §â­è¤~²Ö¿nªº³t«×²MªÅ¡AÁ×§K·Æ¥X¥h
-                rig.velocity = Vector2.zero;
+                // âœ… æœ€å¾Œå¼·åˆ¶å®Œæ•´å°é½Šåˆ°ç›®æ¨™
+                rig.position = Target3D;
+
+                rig.velocity = Vector3.zero;
+                rig.angularVelocity = Vector3.zero;
             }
             else
             {
-                // «ö¤è¦V¨M©w©¹¥ª(-1)ÁÙ¬O©¹¥k(1)
+                // æŒ‰æ–¹å‘æ±ºå®šå¾€å·¦(-1)é‚„æ˜¯å¾€å³(1)
                 x = Mathf.Sign(diff);
                 autoMoveFinished = false;
             }
         }
-        else if (playerControlEnabled)// 2. ¥­±`ª±®a±±¨î
+        else if (playerControlEnabled)// 2. å¹³å¸¸ç©å®¶æ§åˆ¶
         {
             x = Input.GetAxis("Horizontal");
             
         }
-        else // 3. ¨ä¥L±¡ªp¡]¨Ò¦p¼@±¡¤¤¤£µ¹°Ê¡^
+        else // 3. å…¶ä»–æƒ…æ³ï¼ˆä¾‹å¦‚åŠ‡æƒ…ä¸­ä¸çµ¦å‹•ï¼‰
         {
             x = 0f;
         }
 
-        //°Êµe³]©w(§PÂ_¬O§_¦b¨«¸ô)
+        //å‹•ç•«è¨­å®š(åˆ¤æ–·æ˜¯å¦åœ¨èµ°è·¯)
         if (Mathf.Abs(x) > 0.01f)
         {
             animator.SetBool("walk", true);
-            // ¨«¸ô®É¨Ï¥Î°¼­±¹Ï
+            // èµ°è·¯æ™‚ä½¿ç”¨å´é¢åœ–
             //spriteRenderer.sprite = image_1;
             //if (x > 0)
             //{
             //    //sprite.flipX = true;
-            //    //¨¤¦â­±¦V¥kÃä
+            //    //è§’è‰²é¢å‘å³é‚Š
             //    spriteRenderer.flipX = true;
             //}
             //else
@@ -163,7 +161,7 @@ public class CControll : MonoBehaviour
         {
             animator.SetBool("walk", false);
             //spriteRenderer.sprite = image_0;
-            // ¨S¦b²¾°Ê¡A¥Î¥¿­±¹Ï
+            // æ²’åœ¨ç§»å‹•ï¼Œç”¨æ­£é¢åœ–
             spriteRenderer.flipX = false;
 
         }
@@ -173,48 +171,46 @@ public class CControll : MonoBehaviour
     {
         if (isAutoMoving)
         {
-            // ¦Û°Ê²¾°Ê¡Gª½±µ©¹¥Ø¼Ğ¾aªñ¡A¤£¥Î AddForce
+            // è‡ªå‹•ç§»å‹•ï¼šç›´æ¥å¾€ç›®æ¨™é è¿‘ï¼Œä¸ç”¨ AddForce
             float step = moveSpeed * Time.fixedDeltaTime;
-            Vector2 current = rig.position;
-            Vector2 target = new Vector2(Target.x, current.y); // ¥u¬İ X
+            Vector3 current = rig.position;
+            Vector3 target = Target3D; // åªçœ‹ X
 
-            Vector2 newPos = Vector2.MoveTowards(current, target, step);
-            rig.MovePosition(newPos);  // ©Î transform.position = newPos ¤]¦æ
+            Vector3 newPos = Vector3.MoveTowards(current, target, step);
+            rig.MovePosition(newPos);  // æˆ– transform.position = newPos ä¹Ÿè¡Œ
 
-            // ³o¸Ì¤£­n¦A AddForce¡A¤]¤£­n clamp¡A§¹¥ş¦Û¤v±±¨î
+            // é€™è£¡ä¸è¦å† AddForceï¼Œä¹Ÿä¸è¦ clampï¼Œå®Œå…¨è‡ªå·±æ§åˆ¶
         }
         else
         {
-            // ª±®a±±¨î¡Gºû«ù§A­ì¥»ªºª«²z²¾°Ê¼gªk
-            // ¨¤¦â²¾°Ê & ­­³t
-            rig.AddForce(new Vector2(x * moveSpeed, 0f));
+            // ç©å®¶æ§åˆ¶ï¼šç¶­æŒä½ åŸæœ¬çš„ç‰©ç†ç§»å‹•å¯«æ³•
+            // è§’è‰²ç§»å‹• & é™é€Ÿ
+            rig.AddForce(new Vector3(x * moveSpeed, 0f, 0f), ForceMode.Acceleration);
 
-            rig.velocity = new Vector2(
-                Mathf.Clamp(rig.velocity.x, -maxSpeed, maxSpeed),
-                rig.velocity.y
-            );
+            Vector3 v = rig.velocity;
+            v.x = Mathf.Clamp(v.x, -maxSpeed, maxSpeed);
+            rig.velocity = v;
         }
         
     }
 
 
-    /// µ¹¥~³¡©I¥s¡A¶}©l¦Û°Ê¨«¨ì¬Y­Ó X ¦ì¸m
-    public void StartAutoMoveTo(Vector2 Target)
+    /// çµ¦å¤–éƒ¨å‘¼å«ï¼Œé–‹å§‹è‡ªå‹•èµ°åˆ°æŸå€‹ X ä½ç½®
+    public void StartAutoMoveTo(Vector3 Target)
     {
-        this.Target = Target;
-        Debug.Log("1");
+        Target3D = Target;
         isAutoMoving = true;
-        Debug.Log("2");
         autoMoveFinished = false;
-
-        // ¼@±¡®É³q±`·|Ãö±¼ª±®a±±¨î¡AÁ×§K¶Ã°Ê
         playerControlEnabled = false;
 
-        // ¶¶«K¶}±Ò¨«¸ô°Êµe¡]Update ¤]·|³B²z¡A¤£¹L³o¼Ë¤ñ¸û§Y®É¡^
+        // æ¸…æ‰èˆŠçš„ç‰©ç†æ…£æ€§ï¼Œé¿å…ä¸€åˆ‡ã€Œæ»‘ã€è·Ÿã€ŒæŠ–ã€
+        rig.velocity = Vector3.zero;
+        rig.angularVelocity = Vector3.zero;
+
         animator.SetBool("walk", true);
     }
 
-    /// ¼@±¡µ²§ô«á¡A«ì´_ª±®a±±¨î
+    /// åŠ‡æƒ…çµæŸå¾Œï¼Œæ¢å¾©ç©å®¶æ§åˆ¶
     public void EnablePlayerControl()
     {
         playerControlEnabled = true;
@@ -223,7 +219,7 @@ public class CControll : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D collider)
     {
-        if(collider.tag == "ET1")//²Ä¤@­ÓÄ²µoerror¦aÂI
+        if(collider.tag == "ET1")//ç¬¬ä¸€å€‹è§¸ç™¼erroråœ°é»
         {
             firstScript.eT1 = true;
         }

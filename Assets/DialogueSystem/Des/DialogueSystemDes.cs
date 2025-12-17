@@ -37,6 +37,10 @@ public class DialogueSystemDes : MonoBehaviour
     [Header("旁白保留模式")]
     public bool narraSticky = false;        // 開著就不清空旁白
     public bool narraAppendMode = false;    // 開著就換行累積
+    private TextMeshProUGUI typingTarget;
+    private string typingFullLine;
+    private int typingCharIndex;
+    private bool typingAppendMode;
 
     [Header("腳本")]
     public WorldScroller worldScrollerScript;
@@ -200,26 +204,36 @@ public class DialogueSystemDes : MonoBehaviour
         if (target == null) yield break;
 
         isTyping = true;
+
+        typingTarget = target;
+        typingFullLine = line;
+        typingCharIndex = 0;
+        typingAppendMode = false;
+
         if (overwrite) target.text = "";
 
-        foreach (char c in line)
+        while (typingCharIndex < line.Length)
         {
-            target.text += c;
+            target.text += line[typingCharIndex];
+            typingCharIndex++;
             yield return new WaitForSeconds(TextSpeed);
         }
 
         isTyping = false;
         typingRoutine = null;
 
+        typingTarget = null;
+        typingFullLine = null;
+
         if (autoNextLine)
         {
             yield return new WaitForSeconds(autoNextDelay);
             index++;
-
             if (index >= TextList.Count) EndDialogue();
             else SetTextUI();
         }
     }
+
 
     // 正在打字時按 Space：立刻把這一行顯示完整
     private IEnumerator TypeLineAppend(TextMeshProUGUI target, string line)
@@ -228,57 +242,64 @@ public class DialogueSystemDes : MonoBehaviour
 
         isTyping = true;
 
+        typingTarget = target;
+        typingFullLine = line;
+        typingCharIndex = 0;
+        typingAppendMode = true;
+
+        // 只有在「開始新的一行」時才加換行
         if (!string.IsNullOrEmpty(target.text))
             target.text += "\n";
 
-        foreach (char c in line)
+        while (typingCharIndex < line.Length)
         {
-            target.text += c;
+            target.text += line[typingCharIndex];
+            typingCharIndex++;
             yield return new WaitForSeconds(TextSpeed);
         }
 
         isTyping = false;
         typingRoutine = null;
 
+        typingTarget = null;
+        typingFullLine = null;
+
         if (autoNextLine)
         {
             yield return new WaitForSeconds(autoNextDelay);
             index++;
-
             if (index >= TextList.Count) EndDialogue();
             else SetTextUI();
         }
     }
 
-    private void FinishCurrentLineImmediately()
+
+    private void FinishCurrentLineImmediately()//立刻顯示文字
     {
+        if (!isTyping) return;
+
+        // 先把協程停掉，但不要重複 append 整句
         StopTyping();
 
-        if (index < 0 || index >= TextList.Count) return;
+        if (typingTarget == null || string.IsNullOrEmpty(typingFullLine))
+            return;
 
-        var line = TextList[index];
-        if (line.code == LineCode.Player && DiaText)
+        // ✅ 只補上「剩下還沒打完的字」
+        if (typingCharIndex < typingFullLine.Length)
         {
-            DiaText.text = line.content;
-            ForceLayoutNow(DiaText);
-        }
-        if (line.code == LineCode.Narration && NarraDiaText)
-        {
-            if (narraSticky && narraAppendMode)
-            {
-                // append 模式：只補齊當行剩下的字（保險簡化：直接補全）
-                // 若你想更精準補字，我也可以幫你做「只補剩下字」
-                NarraDiaText.text += (NarraDiaText.text.EndsWith("\n") || NarraDiaText.text == "" ? "" : "\n") + line.content;
-            }
-            else
-            {
-                NarraDiaText.text = line.content;
-                ForceLayoutNow(NarraDiaText);
-            }
+            typingTarget.text += typingFullLine.Substring(typingCharIndex);
         }
 
+        ForceLayoutNow(typingTarget);
+
+        // 清理
         isTyping = false;
+        typingTarget = null;
+        typingFullLine = null;
+        typingCharIndex = 0;
+        typingAppendMode = false;
     }
+
 
     private IEnumerator DoActionThenContinue(string actionText)
     {

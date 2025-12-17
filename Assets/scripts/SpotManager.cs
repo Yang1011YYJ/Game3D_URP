@@ -1,4 +1,4 @@
-using System.Collections;
+ï»¿using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using Unity.VisualScripting.Antlr3.Runtime.Misc;
@@ -7,64 +7,70 @@ using UnityEngine.UI;
 
 public class SpotManager : MonoBehaviour
 {
-    public List<DifferenceSpot> activeSpots = new List<DifferenceSpot>();// ¦Û°Ê§ì¡A¤£¥Î¤â°Ê¶ñ
+    [Header("Round Owner")]
+    public Second second; // åœ¨ Inspector æ‹– Second é€²ä¾†
 
-    public int totalCount;          // Á`¦@¦³´X­Ó spot
-    public int foundCount;          // ¤w¸g§ä¨ì´X­Ó
+
+    public List<DifferenceSpot> activeSpots = new List<DifferenceSpot>();// è‡ªå‹•æŠ“ï¼Œä¸ç”¨æ‰‹å‹•å¡«
+
+    public int totalCount;          // ç¸½å…±æœ‰å¹¾å€‹ spot
+    public int foundCount;          // å·²ç¶“æ‰¾åˆ°å¹¾å€‹
                                     // Start is called before the first frame update
-                                    // ¦Û°Ê§ì³õ´º¤¤©Ò¦³ DifferenceSpot¡]¥]§t¨S±Ò¥Îªº¡A¥Î true¡^
+                                    // è‡ªå‹•æŠ“å ´æ™¯ä¸­æ‰€æœ‰ DifferenceSpotï¼ˆåŒ…å«æ²’å•Ÿç”¨çš„ï¼Œç”¨ trueï¼‰
     [Header("UI")]
-    public TextMeshProUGUI text;//­pºâ¼Æ¶q
+    public TextMeshProUGUI text;//è¨ˆç®—æ•¸é‡
 
     void Awake()
     {
-        
+        text.gameObject.SetActive(false);
     }
     public void RefreshActiveSpots()
     {
         activeSpots.Clear();
 
-        // §ì³õ´º¤º©Ò¦³ DifferenceSpot¡]¥]§t¨S±Ò¥Îªº¡^
         DifferenceSpot[] allSpots = FindObjectsOfType<DifferenceSpot>(true);
 
-        // ¶¶«KÀ°¨C­Ó spot ³]©w manager
         foreach (var s in allSpots)
         {
             if (s.gameObject.activeInHierarchy)
             {
                 activeSpots.Add(s);
-                s.manager = this;       // À°¥¦¸j manager
-                s.ResetSpot();         // ÁÙ­ì found ª¬ºA¡]Á×§KÂÂª¬ºA´İ¯d¡^
+
+                s.manager = this;
+                s.second = second;   // âœ… ç¶ Second
+                s.ResetSpot();
             }
         }
+
         totalCount = activeSpots.Count;
         foundCount = 0;
+
         if (text != null)
             text.text = $"{foundCount} / {totalCount}";
 
-        Debug.Log($"Á`¦@¦³ {totalCount} ­Ó¥i¥H§äªº¦a¤è");
+        Debug.Log($"[SpotManager] ç¸½å…±æœ‰ {totalCount} å€‹å¯ä»¥æ‰¾çš„åœ°æ–¹");
     }
 
-    //³Q DifferenceSpot ©I¥s¡G¬Y­Ó spot ³Q§ä¨ì®É¶i¨Ó
+    //è¢« DifferenceSpot å‘¼å«ï¼šæŸå€‹ spot è¢«æ‰¾åˆ°æ™‚é€²ä¾†
     public void OnSpotFound(DifferenceSpot spot)
     {
-        // ¦pªG³o­Ó spot ¤£¦b¥Ø«e active ¦Cªí¡A´N¤£ºâ
         if (!activeSpots.Contains(spot))
         {
-            Debug.Log($"[SpotManager] ¦¬¨ì¤@­Ó¤£¦b active ¦Cªí¤ºªº spot¡G{spot.name}");
+            Debug.Log($"[SpotManager] ä¸åœ¨ active åˆ—è¡¨å…§çš„ spotï¼š{spot.name}");
             return;
         }
+
         foundCount++;
 
-        Debug.Log($"§ä¨ì²Ä {foundCount} ­Ó¡A¶i«×¡G{foundCount} / {totalCount}");
+        if (text != null)
+            text.text = $"{foundCount} / {totalCount}";
 
-        // ³o¸Ì¤§«á¥i¥H¥[¡G
-        text.text = foundCount+" / "+totalCount;
-        // - ¦pªG foundCount == totalCount ¡÷ Åã¥Ü¡u¥ş³¡§ä§¹¡vµe­±
+        Debug.Log($"[SpotManager] æ‰¾åˆ°ç¬¬ {foundCount} å€‹ï¼Œé€²åº¦ï¼š{foundCount}/{totalCount}");
+
         if (foundCount >= totalCount)
         {
-            Debug.Log("¥ş³¡§ä§¹°Õ¡I");
-            // TODO¡G¼u¥X§¹¦¨µe­±¡B¤U¤@Ãö«ö¶sµ¥µ¥
+            Debug.Log("[SpotManager] å…¨éƒ¨æ‰¾å®Œå•¦ï¼");
+
         }
     }
 
@@ -77,7 +83,14 @@ public class SpotManager : MonoBehaviour
             Destroy(c.gameObject);
         }
 
-        Debug.Log("[SpotManager] ¤w²M±¼©Ò¦³¼Ğ°O°é°é");
+        Debug.Log("[SpotManager] å·²æ¸…æ‰æ‰€æœ‰æ¨™è¨˜åœˆåœˆ");
     }
-
+    public void SetSpotsInteractable(bool on)
+    {
+        foreach (var s in activeSpots)
+        {
+            var btn = s.GetComponent<Button>();
+            if (btn != null) btn.interactable = on;
+        }
+    }
 }

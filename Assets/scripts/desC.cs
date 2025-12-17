@@ -156,8 +156,8 @@ public class desC : MonoBehaviour
     {
         if (cControllScript == null || middlePoint == null) yield break;
 
-        cControllScript.Target = middlePoint.position;
-        cControllScript.StartAutoMoveTo(cControllScript.Target);
+        cControllScript.Target3D = middlePoint.position;
+        cControllScript.StartAutoMoveTo(cControllScript.Target3D);
         yield return new WaitUntil(() => cControllScript.autoMoveFinished);
     }
 
@@ -165,7 +165,7 @@ public class desC : MonoBehaviour
     {
         if (cControllScript == null || boardBusTarget == null) yield break;
 
-        cControllScript.Target = boardBusTarget.position;
+        cControllScript.Target3D = boardBusTarget.position;
         cControllScript.autoMoveFinished = false;
         cControllScript.animator.SetBool("walk", true);
         cControllScript.isAutoMoving = true;
@@ -235,7 +235,6 @@ public class desC : MonoBehaviour
 
     public IEnumerator Act_NextScene(string sceneName)
     {
-        StartCoroutine(fader.FadeExposure(1, normalExposure, darkExposure));
         yield return new WaitForSeconds(2f);
         sceneChangeScript.SceneC("01");
     }
@@ -315,8 +314,8 @@ public class desC : MonoBehaviour
     {
         if (InsideSitPos == null || cControllScript == null) yield break;
 
-        cControllScript.Target = InsideSitPos.position;
-        cControllScript.StartAutoMoveTo(cControllScript.Target);
+        cControllScript.Target3D = InsideSitPos.position;
+        cControllScript.StartAutoMoveTo(cControllScript.Target3D);
         yield return new WaitUntil(() => cControllScript.autoMoveFinished);
         yield return new WaitForSeconds(1);
     }

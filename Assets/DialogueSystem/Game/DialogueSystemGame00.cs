@@ -6,8 +6,12 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
+
 public class DialogueSystemGame00 : MonoBehaviour
 {
+    private First owner;
+    public void BindOwner(First o) => owner = o;
+
     [Header("UI")]
     public GameObject TextPanel;
     public TextMeshProUGUI DiaText;
@@ -39,12 +43,13 @@ public class DialogueSystemGame00 : MonoBehaviour
     public SceneCheckpoint jumpTarget = SceneCheckpoint.AfterDialogue;
 
 
+
     [Header("腳本")]
     public CControll cControllScript;
     public First firstScript;
     public AnimationScript animationScript;
     public SceneChange sceneChangeScript;
-
+    public FadeInByExposure fader;
     public enum LineCode { Player = 0, Action = 1, Narration = 2 }
 
     // ---- 內部資料結構：每一句 = (code, content)
@@ -62,9 +67,19 @@ public class DialogueSystemGame00 : MonoBehaviour
     [Tooltip("標記是否正在打字")]public bool isTyping = false;
     private Coroutine typingRoutine;
     private bool isBusy = false; // 執行動作/等待中，先鎖住輸入
+
+    [Header("自動播放設定")]
+    [Tooltip("true 就自動下一行")] public bool autoNextLine = false;
+    [Tooltip("每行播完後停多久再自動下一行")] public float autoNextDelay = 0.5f;
+
+    [Header("旁白保留模式")]
     // 旁白累加（讓幾句旁白不被洗掉）
-    [Tooltip("是否進入「旁白保留模式」")]public bool narraSticky = false;      // 是否進入「旁白保留模式」
+    [Tooltip("是否進入「旁白保留模式」")] public bool narraSticky = false;      // 是否進入「旁白保留模式」
     [Tooltip("旁白顯示時用 append 而不是覆蓋")] public bool narraAppendMode = false;  // 旁白顯示時用 append 而不是覆蓋
+    private TextMeshProUGUI typingTarget;
+    private string typingFullLine;
+    private int typingCharIndex;
+    private bool typingAppendMode;
 
 
     void Awake()
@@ -357,22 +372,41 @@ public class DialogueSystemGame00 : MonoBehaviour
 
 
     // 打字機：一個字一個蹦出來
-    IEnumerator TypeLine(TextMeshProUGUI target, string line)
+    private IEnumerator TypeLine(TextMeshProUGUI target, string line, bool overwrite)
     {
         if (target == null) yield break;
 
         isTyping = true;
-        target.text = "";
 
-        foreach (char c in line)
+        typingTarget = target;
+        typingFullLine = line;
+        typingCharIndex = 0;
+        typingAppendMode = false;
+
+        if (overwrite) target.text = "";
+
+        while (typingCharIndex < line.Length)
         {
-            target.text += c;
+            target.text += line[typingCharIndex];
+            typingCharIndex++;
             yield return new WaitForSeconds(TextSpeed);
         }
 
         isTyping = false;
         typingRoutine = null;
+
+        typingTarget = null;
+        typingFullLine = null;
+
+        if (autoNextLine)
+        {
+            yield return new WaitForSeconds(autoNextDelay);
+            index++;
+            if (index >= TextList.Count) EndDialogue();
+            else SetTextUI();
+        }
     }
+
 
     // ---- 顯示/打字：集中處理，避免到處寫一樣的 code ----
     private void ShowLineOnPlayer(string content)
@@ -404,25 +438,43 @@ public class DialogueSystemGame00 : MonoBehaviour
     }
 
     // 新增：旁白 append 的打字機
-    IEnumerator TypeLineAppend(TextMeshProUGUI target, string line)
+    private IEnumerator TypeLineAppend(TextMeshProUGUI target, string line)
     {
         if (target == null) yield break;
 
         isTyping = true;
 
-        // 已有文字就先換行
+        typingTarget = target;
+        typingFullLine = line;
+        typingCharIndex = 0;
+        typingAppendMode = true;
+
+        // 只有在「開始新的一行」時才加換行
         if (!string.IsNullOrEmpty(target.text))
             target.text += "\n";
 
-        foreach (char c in line)
+        while (typingCharIndex < line.Length)
         {
-            target.text += c;
+            target.text += line[typingCharIndex];
+            typingCharIndex++;
             yield return new WaitForSeconds(TextSpeed);
         }
 
         isTyping = false;
         typingRoutine = null;
+
+        typingTarget = null;
+        typingFullLine = null;
+
+        if (autoNextLine)
+        {
+            yield return new WaitForSeconds(autoNextDelay);
+            index++;
+            if (index >= TextList.Count) EndDialogue();
+            else SetTextUI();
+        }
     }
+
 
 
     public void SetPanels(bool playerOn, bool narraOn)
@@ -432,57 +484,32 @@ public class DialogueSystemGame00 : MonoBehaviour
     }
 
     // 正在打字時按 Space：立刻把這一行顯示完整
-    void FinishCurrentLineImmediately()
+    private void FinishCurrentLineImmediately()
     {
+        if (!isTyping) return;
 
+        // 先把協程停掉，但不要重複 append 整句
         StopTyping();
 
-        if (index < 0 || index >= TextList.Count) return;
+        if (typingTarget == null || string.IsNullOrEmpty(typingFullLine))
+            return;
 
-        var line = TextList[index];
-
-        if (line.code == LineCode.Narration)
+        // ✅ 只補上「剩下還沒打完的字」
+        if (typingCharIndex < typingFullLine.Length)
         {
-            if (NarraText != null)
-            {
-                // ⭐ 關鍵：如果是 append 模式，就「補齊當前這一句」，不要洗掉前文
-                if (narraAppendMode)
-                {
-                    // 如果目前正在打字，target.text 裡已經有「部分字」
-                    // 我們只需要補上「還沒出現的剩餘字」
-                    string current = NarraText.text;
-
-                    // 找出最後一行已經顯示到哪
-                    string[] lines = current.Split('\n');
-                    string lastLine = lines[^1];
-
-                    if (line.content.StartsWith(lastLine))
-                    {
-                        // 補上剩下的部分
-                        string rest = line.content.Substring(lastLine.Length);
-                        NarraText.text += rest;
-                    }
-                    else
-                    {
-                        // 保險：如果狀態怪了，至少不要洗掉前面
-                        NarraText.text += "\n" + line.content;
-                    }
-                }
-                else
-                {
-                    // 非 append（一般旁白）才覆蓋
-                    NarraText.text = line.content;
-                }
-            }
-        }
-        else
-        {
-            if (DiaText != null)
-                DiaText.text = line.content;
+            typingTarget.text += typingFullLine.Substring(typingCharIndex);
         }
 
+        ForceLayoutNow(typingTarget);
+
+        // 清理
         isTyping = false;
+        typingTarget = null;
+        typingFullLine = null;
+        typingCharIndex = 0;
+        typingAppendMode = false;
     }
+
 
     // ---------- 動作系統：你可以在這裡擴充 ----------
     private IEnumerator DoActionThenContinue(string actionText)
@@ -515,161 +542,138 @@ public class DialogueSystemGame00 : MonoBehaviour
         if (key.StartsWith("Label_"))
             yield break;
 
-        // TODO：你可以在這裡接動畫、音效、顯示手機 UI、角色移動等
-        // 範例：如果文本包含「手機」，就等待 0.8 秒當作演出時間
+        if (owner == null)
+        {
+            Debug.LogWarning("[DialogueSystemGame00] owner(First) is null, action ignored: " + key);
+            yield break;
+        }
+
+        yield return DispatchAction(key, actionText);
+        // key 是乾淨命令，actionText 保留括號內容讓你解析參數用
+    }
+
+    public IEnumerator DispatchAction(string key, string raw)
+    {
         switch (key)
         {
-            case "PickPhone":
-                cControllScript.animator.SetBool("phone", true);
-                yield return StartCoroutine(firstScript.WaitForAnimation(cControllScript.animator, "phone"));
-                firstScript.PhonePanel.SetActive(true);
-                yield return new WaitForSeconds(2f);
-                firstScript.PhonePanel.SetActive(false);
-                cControllScript.animator.SetBool("phone", false);
+            case "LightOn":
+                yield return owner.Act_LightOn();
                 break;
 
-            case "WalkToFront":
-                cControllScript.Target = new Vector3(-7.97f, 1.96f, -1.71f);
-                cControllScript.autoMoveFinished = false;
-                cControllScript.animator.SetBool("walk", true);
-                cControllScript.isAutoMoving = true;
-                yield return new WaitUntil(() => cControllScript.autoMoveFinished);
+            case "LightBlack":
+                yield return owner.Act_LightBlack();
+                break;
 
-                cControllScript.animator.SetBool("walk", false);
+            case "BusLightBright":
+                yield return owner.Act_BusLightBright();
                 break;
 
             case "eyeclose":
-                cControllScript.animator.SetBool("eyeclose", true);
-                yield return new WaitForSeconds(3f);
-                cControllScript.animator.SetBool("eyeclose", false);
+                if (cControllScript != null && cControllScript.animator != null)
+                {
+                    cControllScript.animator.SetBool("eyeclose", true);
+                    yield return new WaitForSeconds(2f); // 你自己調
+                }
                 break;
 
-            case "BlackPanelOn":
-                //yield return StartCoroutine(firstScript.fader.FadeExposure(0.1f/*持續時間*/, 0.5f/*起始*/, -10f/*終點*/));
-                firstScript.BlackPanel.SetActive(true);
-                animationScript.Fade(firstScript.BlackPanel, 1f, 0f, 1f, null);
+            case "eyecloseBackToIdle":
+                if (cControllScript != null && cControllScript.animator != null)
+                {
+                    cControllScript.animator.SetBool("eyeclose", false);
+                    firstScript.Player.transform.position = firstScript.PlayerStartPos.position;
+                    yield return new WaitForSeconds(1.5f);
+                }
                 break;
 
-            case "BlackPanelOff":
-                //yield return StartCoroutine(firstScript.fader.FadeExposure(0.1f/*持續時間*/, 0.5f/*起始*/, -10f/*終點*/));
-                //firstScript.BlackPanel.SetActive(false);
-                animationScript.Fade(firstScript.BlackPanel, 1f, 1f, 0f, null);
-                firstScript.BlackPanel.SetActive(false);
+            case "LeftRight":
+                yield return owner.Act_LeftRight();
                 break;
 
-            case "LeftAndRight":
-                cControllScript.PlayerAniAndSprite.GetComponent<SpriteRenderer>().sprite = cControllScript.leftidle;
-                yield return new WaitForSeconds(0.5f);
-                cControllScript.PlayerAniAndSprite.GetComponent<SpriteRenderer>().flipX = true;//面向右邊
-                yield return new WaitForSeconds(0.5f);
-                cControllScript.PlayerAniAndSprite.GetComponent<SpriteRenderer>().flipX = false;//面向左邊
-                yield return new WaitForSeconds(0.5f);
-                cControllScript.PlayerAniAndSprite.GetComponent<SpriteRenderer>().flipX = true;//面向右邊
-                yield return new WaitForSeconds(0.5f);
-                cControllScript.PlayerAniAndSprite.GetComponent<SpriteRenderer>().flipX = false;//面向左邊
-                cControllScript.PlayerAniAndSprite.GetComponent<SpriteRenderer>().sprite = cControllScript.idle;
-                break;
-
-            case "PhoneOn":
-                firstScript.PhonePanel.SetActive(true);
+            case "PickPhone":
+                yield return owner.Act_PickPhone();
                 break;
 
             case "PickPhoneOn":
-                cControllScript.animator.SetBool("phone", true);
-                yield return firstScript.WaitForAnimation(cControllScript.animator, "phone");
-                firstScript.PhonePanel.SetActive(true);
-                cControllScript.animator.SetBool("phone", false);
+                yield return owner.Act_PickPhoneOn();
                 break;
 
-            // 1) WaitForTeach：教學中，等回到遊戲畫面才繼續
-            case "WaitForTeach":
+            case "BusShake":
+                yield return owner.Act_BusShake(true);
+                break;
+
+            case "BusShakeWithDamping":
                 if (firstScript != null)
-                {
-                    // 1) 先等教學真的開始（teachRoutine 變成非 null）
-                    yield return new WaitUntil(() => firstScript.teachRoutine != null);
-
-                    // 2) 再等教學結束（teachRoutine 回到 null）
-                    yield return new WaitUntil(() => firstScript.teachRoutine == null);
-                }
-
+                    yield return firstScript.Act_BusShakeWithDamping(true);
                 break;
 
-            // 2) Tutorial_AnomalyAppear：進入教學2，結束才回來繼續對話
-            case "Tutorial_AnomalyAppear":
-                if (firstScript != null)
-                    firstScript.RequestTeach2(); // 只發請求，不在這裡跑協程
+            case "BlackPanelOn":
+                yield return owner.Act_BlackPanelOn();
                 break;
 
-            // 3) Tutorial_ExplainInterrupted：把旁白框關掉、並解除「旁白保留模式」
-            case "Tutorial_ExplainInterrupted":
-                narraSticky = false;
-                narraAppendMode = false;
-                if (NarraText != null) NarraText.text = "";
-                SetPanels(false, false); // 關掉旁白對話框
+            case "BlackPanelOn2":
+                yield return owner.Act_BlackPanelOn2();
                 break;
 
-            // 4) LightOn：燈光恢復正常
-            case "LightOn":
-                if (firstScript != null && firstScript.fader != null)
-                    yield return firstScript.fader.FadeExposure(0.8f, -10f, 0.5f);
-                break;
-
-            // 5) LightFlicker：燈光閃爍（你可自己決定閃幾次）
-            case "LightFlicker":
-                if (firstScript != null)
-                    yield return firstScript.StartCoroutine(firstScript.LightFlickerOnce());
-                break;
-
-            // 6) LightDimDown：燈光暗下來（曝光 0.5 → -10）
-            case "LightDimDown":
-                if (firstScript != null && firstScript.fader != null)
-                    yield return firstScript.fader.FadeExposure(0.8f, 0.5f, -10f);
-                break;
-
-            // 7) BusShake_Strong：車子搖晃（你做成相機震動或物件晃動）
-            case "BusShake_Strong":
-                if (firstScript != null)
-                    //yield return firstScript.StartCoroutine(firstScript.BusShakeStrong(1.0f));
-                    yield return null;
-                break;
-
-            // 8) ShowPhoto_S02_Photo_01b：照片出現
-            case "ShowPhoto_S02_Photo_01b":
-                if (firstScript != null)
-                    firstScript.ShowPhoto("S02_Photo_01b");
-                break;
-
-            // 9) bigpicture：放大照片 target 區塊到指定大小
-            case "bigpicture":
-                if (firstScript != null)
-                    yield return firstScript.BigPictureZoom();
-                break;
-
-            // 10) TimeJump_1930：時間改變
-            case "TimeJump_1930":
-                if (firstScript != null)
-                    firstScript.SetTimeText("19:30");
-                break;
-
-            // 12) ShowTitle_Game_Title：遊戲名稱顯示
-            case "ShowTitle_Game_Title":
-                if (firstScript != null)
-                    yield return firstScript.StartCoroutine(firstScript.ShowGameTitle());
+            case "BlackPanelOff":
+                yield return owner.Act_BlackPanelOff();
                 break;
 
             case "InTeach":
-                //FirstDiaFinished = true;
-                allowFastReveal = true;
-                if (firstScript != null) firstScript.RequestTeach1();
+                owner.RequestTeach1();
+                break;
+
+            case "WaitForTeach":
+                yield return owner.Act_WaitForTeach();
+                break;
+
+            case "Tutorial_AnomalyAppear":
+                owner.RequestTeach2();
+                break;
+
+            case "Tutorial_ExplainInterrupted":
+                //yield return owner.Act_TutorialExplainInterrupted();
+                narraSticky = false;
+                narraAppendMode = false;
+                if (NarraText != null)
+                    NarraText.text = "";
+
+                SetPanels(false, false);
+                yield return new WaitForSeconds(1.5f);
+                break;
+
+            case "TimeJump_1930":
+                owner.SetTimeText("19:30");
+                break;
+
+            case "ShowPhoto_S02_Photo_01b":
+                owner.ShowPhoto("S02_Photo_01b");
+                break;
+
+            case "bigpicture":
+                yield return owner.BigPictureZoom();
+                break;
+
+            case "LightFlicker":
+                yield return owner.LightFlickerOnce();
+                break;
+
+            case "LightDimDown":
+                yield return owner.Act_LightDimDown();
+                break;
+
+            case "ShowTitle_Game_Title":
+                yield return owner.ShowGameTitle();
+                break;
+
+            case "WalkToFront":
+                yield return owner.Act_WalkToFront();
                 break;
 
             default:
-                // 沒吃到的 key，就當作空動作（但建議 log 方便你抓拼字）
-                Debug.LogWarning($"[DialogueSystemGame00] 未處理的 Action key: {key}");
+                Debug.LogWarning("[First] Unhandled action key: " + key + " raw=" + raw);
                 break;
         }
     }
-
     // ---- 面板/結束 ----
     private bool anyPanelOn()
     {
@@ -696,6 +700,24 @@ public class DialogueSystemGame00 : MonoBehaviour
             animationScript.Fade(firstScript.BlackPanel,1f,0f,1f, ()=> sceneChangeScript.SceneC("02"));
         }
         EndDialogue();
+    }
+
+    private void ForceLayoutNow(TextMeshProUGUI target)
+    {
+        if (!target) return;
+
+        // 1) 讓 TMP 立刻更新字形/網格，算出正確 preferredWidth
+        target.ForceMeshUpdate();
+
+        // 2) 立刻讓 layout 系統重算（ContentSizeFitter / LayoutGroup 才會跟上）
+        Canvas.ForceUpdateCanvases();
+
+        // 3) 針對文字與它的父物件往上重建（背景框通常在父物件）
+        LayoutRebuilder.ForceRebuildLayoutImmediate(target.rectTransform);
+
+        var parentRT = target.rectTransform.parent as RectTransform;
+        if (parentRT != null)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(parentRT);
     }
 }
 
