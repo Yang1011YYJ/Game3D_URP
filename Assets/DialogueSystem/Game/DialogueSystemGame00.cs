@@ -412,7 +412,7 @@ public class DialogueSystemGame00 : MonoBehaviour
     private void ShowLineOnPlayer(string content)
     {
         SetPanels(true, false);
-        typingRoutine = StartCoroutine(TypeLine(DiaText, content));
+        typingRoutine = StartCoroutine(TypeLine(DiaText, content,true));
     }
 
     private void ShowLineOnNarration(string content)
@@ -433,7 +433,7 @@ public class DialogueSystemGame00 : MonoBehaviour
         }
         else
         {
-            typingRoutine = StartCoroutine(TypeLine(NarraText, content));
+            typingRoutine = StartCoroutine(TypeLine(NarraText, content,true));
         }
     }
 

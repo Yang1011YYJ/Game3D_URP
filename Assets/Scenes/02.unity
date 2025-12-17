@@ -8314,6 +8314,10 @@ MonoBehaviour:
   TextSpeed: 0.06
   playOnEnable: 0
   allowFastReveal: 0
+  autoNextLine: 0
+  autoNextDelay: 0.5
+  narraSticky: 0
+  narraAppendMode: 0
   index: 0
   isTyping: 0
 --- !u!114 &1577382539
@@ -8384,12 +8388,9 @@ MonoBehaviour:
   RedPanel: {fileID: 1022858666}
   timetext: {fileID: 1254735802}
   TitlePanel: {fileID: 2068197883}
-  Mistake: 0
-  errorResultHandled: 0
   busRoot: {fileID: 3680119844855839327}
   busRb: {fileID: 0}
   HintText: {fileID: 1086042937}
-  maxMistakes: 2
 --- !u!1 &1610831444
 GameObject:
   m_ObjectHideFlags: 0

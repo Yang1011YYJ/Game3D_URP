@@ -148,12 +148,12 @@ public class DialogueSystemGame01 : MonoBehaviour
         {
             case LineCode.Player:
                 SetPanels(true, false);
-                typingRoutine = StartCoroutine(TypeLine(DiaText, line.content));
+                typingRoutine = StartCoroutine(TypeLine(DiaText, line.content,true));
                 break;
 
             case LineCode.Narration:
                 SetPanels(false, true);
-                typingRoutine = StartCoroutine(TypeLine(NarraText, line.content));
+                typingRoutine = StartCoroutine(TypeLine(NarraText, line.content,true));
                 break;
 
             case LineCode.Action:
