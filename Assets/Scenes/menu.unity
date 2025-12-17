@@ -620,8 +620,9 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\u904A\u6232\u958B\u59CB\n"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 1dc2ffdb80dd88f4d96596e73aba1261, type: 2}
-  m_sharedMaterial: {fileID: 4013858086083392826, guid: 1dc2ffdb80dd88f4d96596e73aba1261, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 0e3706e96b1738b41ba4b41cdebd5860, type: 2}
+  m_sharedMaterial: {fileID: 5832394274478373412, guid: 0e3706e96b1738b41ba4b41cdebd5860,
+    type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []

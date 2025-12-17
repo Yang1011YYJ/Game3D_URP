@@ -658,7 +658,7 @@ public class DialogueSystemGame00 : MonoBehaviour
                 break;
 
             case "InTeach":
-                FirstDiaFinished = true;
+                //FirstDiaFinished = true;
                 allowFastReveal = true;
                 if (firstScript != null) firstScript.RequestTeach1();
                 break;

@@ -16,6 +16,7 @@ public class CControll : MonoBehaviour
     [Tooltip("抓頭")] public AnimationClip Catch;
     [Tooltip("閉眼")] public AnimationClip eyeclose;
     [Tooltip("面相左邊")] public Sprite leftidle;
+    [Tooltip("面左的看手機sprite")] public Sprite leftphoneidle;
 
     [Header("角色外表")]
     public GameObject PlayerAniAndSprite;

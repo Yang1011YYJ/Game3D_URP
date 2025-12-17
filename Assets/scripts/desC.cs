@@ -1,6 +1,8 @@
-using System.Collections;
+ï»¿using System.Collections;
 using System.Collections.Generic;
 using TMPro;
+using Unity.Collections.LowLevel.Unsafe;
+using Unity.VisualScripting.Dependencies.Sqlite;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -10,67 +12,93 @@ using static UnityEngine.GraphicsBuffer;
 public class desC : MonoBehaviour
 {
     [Header("UI")]
-    [Tooltip("Åã¥Ü°T®§")]public GameObject PhoneMessage;
-    [Tooltip("Ãö³¬«ö¶s")] public GameObject CloseButton;
+    [Tooltip("é¡¯ç¤ºè¨Šæ¯")]public GameObject PhoneMessage;
+    [Tooltip("é—œé–‰æŒ‰éˆ•")] public GameObject CloseButton;
     [Space]
-    [Tooltip("«e¥b¬q¤õ¨®")] public GameObject TrainFront;
-    [Tooltip("«á¥b¬q¤õ¨®")] public GameObject TrainBack;
-    [Tooltip("¤õ¨®¾ãÅégroup")] public GameObject Train;
-    [Tooltip("°_©l¦ì¸m¡]µe­±¥~¡^")] public Transform trainStartPoint;
-    [Tooltip("°±¤U¨Óªº¦ì¸m¡]¤ë¥x«e¡^")] public Transform trainStopPoint;
-    [Tooltip("¤õ¨®²¾°Ê³t«×")] public float trainSpeed = 5f;
+    [Tooltip("ç«è»Šæ•´é«”group")] public GameObject Bus;
+    [Tooltip("èµ·å§‹ä½ç½®ï¼ˆç•«é¢å¤–ï¼‰")] public Transform BusStartPoint;
+    [Tooltip("åœä¸‹ä¾†çš„ä½ç½®ï¼ˆæœˆå°å‰ï¼‰")] public Transform BusStopPoint;
+    [Tooltip("é›¢é–‹ä½ç½®ï¼ˆç•«é¢å¤–ï¼‰")]public Transform BusLeavePoint;
+    [Tooltip("ç«è»Šç§»å‹•é€Ÿåº¦")] public float BusSpeed = 5f;
     [Space]
-    [Tooltip("»¡©ú­±ªO")] public GameObject DesPanel;
-    [Tooltip("¶Â¦â¾B¸n")] public GameObject BlackPanel;//
-    [Tooltip("Åã¥Ü¦aÂIªº¤å¦r")] public TextMeshProUGUI PlaceText;
+    [Tooltip("èªªæ˜é¢æ¿")] public GameObject DesPanel;
+    [Tooltip("é»‘è‰²é®ç½©")] public GameObject BlackPanel;//
+    [Tooltip("é¡¯ç¤ºåœ°é»çš„æ–‡å­—")] public TextMeshProUGUI PlaceText;
 
-    [Header("¨¤¦â")]
+    [Header("è§’è‰²")]
     public GameObject Player;
-    Animator PlayerAnimator;
-    [Tooltip("¥D¨¤¦ì¸m")] public Transform playerTransform;
-    [Tooltip("¥D¨¤¨«¸ô³t«×")] public float walkSpeed = 5f;
-    [Tooltip("¨«¨ìªº¡u¤¤¶¡¡v¦ì¸m")] public Transform middlePoint;
-    [Tooltip("¤â¾÷¹aÁn01")] public GameObject ring01;
-    [Tooltip("¤â¾÷¹aÁn02")] public GameObject ring02;
+    public GameObject PlayerWithAnim;
+    public Animator PlayerAnimator;
+    [Tooltip("ä¸»è§’ä½ç½®")] public Transform playerTransform;
+    [Tooltip("ä¸»è§’èµ·å§‹ä½ç½®")] public Transform playerStartPos;
+    [Tooltip("ä¸»è§’èµ°è·¯é€Ÿåº¦")] public float walkSpeed = 5f;
+    [Tooltip("èµ°é€²ä¾†åœä¸‹çš„ä½ç½®")] public Transform middlePoint;              // èµ°é€²ä¾†åœçš„ä½ç½®
+    [Tooltip("ä¸Šè»Šä½ç½®")] public Transform boardBusTarget;
+    [Tooltip("æ‰‹æ©Ÿéˆ´è²01")] public GameObject ring01;
+    [Tooltip("æ‰‹æ©Ÿéˆ´è²02")] public GameObject ring02;
+    [Tooltip("å¤–é¢ä¸–ç•Œæ¨¡å‹")] public GameObject outside;
+    [Tooltip("è»Šå­è£¡é¢æ¨¡å‹")] public GameObject inside;
 
-    [Header("¸}¥»")]
+    [Tooltip("ç©å®¶é€²å…¥å¾Œçš„ä½ç½®")] public Transform InsidePos;
+    [Tooltip("ç©å®¶åº§ä½ä½ç½®")] public Transform InsideSitPos;
+
+
+    [Header("ç›¸æ©Ÿ")]
+    [Tooltip("æ›å…‰ï¼ˆURP Volumeï¼‰")]
+    public float normalExposure = 0.5f;
+    public float darkExposure = -10f;
+
+    [Header("è…³æœ¬")]
     public AnimationScript animationScript;
     public CControll cControllScript;
     public SceneChange sceneChangeScript;
     public DialogueSystemDes dialogueSystemDesScript;
+    public FadeInByExposure fader;
+    public WorldScroller worldScrollerScript;
     private void Awake()
     {
         animationScript = GetComponent<AnimationScript>();
         cControllScript = Player.GetComponent<CControll>();
         sceneChangeScript = FindAnyObjectByType<SceneChange>();
         dialogueSystemDesScript = FindAnyObjectByType<DialogueSystemDes>();
+        if (Player != null) cControllScript = FindAnyObjectByType<CControll>();
+        if (fader == null) fader = FindAnyObjectByType<FadeInByExposure>();
+        if (worldScrollerScript == null) worldScrollerScript = FindAnyObjectByType<WorldScroller>();
+
     }
     private void Start()
     {
-        if (cControllScript == null)
-        {
-            cControllScript = Player.GetComponent<CControll>();
-        }
 
         PlayerAnimator = cControllScript != null ? cControllScript.animator : null;
 
         if (PlayerAnimator == null)
         {
-            // «OÀI¡G¦Û¤v§ä¤@¦¸
-            PlayerAnimator = Player.GetComponentInChildren<Animator>();
+            // ä¿éšªï¼šè‡ªå·±æ‰¾ä¸€æ¬¡
+            PlayerAnimator = PlayerWithAnim.GetComponentInChildren<Animator>();
         }
 
         if (PlayerAnimator == null)
         {
-            Debug.LogError("[desC] §ä¤£¨ì Player ªº Animator¡A½ĞÀË¬d Player ¶¥¼h¡C", this);
+            Debug.LogError("[desC] æ‰¾ä¸åˆ° Player çš„ Animatorï¼Œè«‹æª¢æŸ¥ Player éšå±¤ã€‚", this);
         }
-        BlackPanel.SetActive(false);
-        PhoneMessage.SetActive(false);
-        DesPanel.SetActive(false);
-        PlaceText.gameObject.SetActive(false);
-        ring01.SetActive(false);
-        ring02.SetActive(false);
-        StartCoroutine(SceneFlow());
+        // åˆå§‹ UI
+        if (BlackPanel) BlackPanel.SetActive(false);
+        if (PhoneMessage) PhoneMessage.SetActive(false);
+        if (CloseButton) CloseButton.SetActive(false);
+        if (DesPanel) DesPanel.SetActive(false);
+        if (PlaceText) PlaceText.gameObject.SetActive(false);
+        if (ring01) ring01.SetActive(false);
+        if (ring02) ring02.SetActive(false);
+
+        if (Bus) Bus.SetActive(false); // âœ… ç­‰è»Šéšæ®µä¸é¡¯ç¤º
+
+        // ç›´æ¥é–‹å§‹è·‘åŠ‡æœ¬ï¼ˆä½ æŠŠå®Œæ•´åŠ‡æœ¬ TextAsset æ‹–çµ¦ DialogueSystemDesï¼‰
+        if (dialogueSystemDesScript != null)
+        {
+            dialogueSystemDesScript.BindOwner(this);
+            dialogueSystemDesScript.autoNextLine = false; // ä½ é€™æ®µåŠ‡æƒ…æ¯”è¼ƒåƒè‡ªå‹•æ’­æ”¾
+            dialogueSystemDesScript.StartDialogue(dialogueSystemDesScript.Textfile01);
+        }
     }
     //public void StartButton()
     //{
@@ -81,15 +109,142 @@ public class desC : MonoBehaviour
     //    StartCoroutine(animationScript.FadeOutAndChangeScene(BlackPanel.GetComponent<CanvasGroup>(), 1.5f, "menu"));
     //}
 
-    IEnumerator SceneFlow()
-    {
-        //0.¶Â¹õ²H¤J
-        BlackPanel.SetActive(true);
-        animationScript.Fade(BlackPanel, 1f, 1f, 0f, null);
-        yield return new WaitForSeconds(1.5f);
-        BlackPanel.SetActive(false);
+    // ====== çµ¦ DialogueSystemDes å‘¼å«çš„ Action ======
 
-        //1.¦aÂIÅã¥Ü
+    public IEnumerator Act_PhoneSprite()
+    {
+
+        //PlayerAnimator.SetBool("phone", true);
+        PlayerWithAnim.GetComponent<SpriteRenderer>().sprite = cControllScript.leftphoneidle;
+        yield return new WaitForSeconds(2f);
+    }
+
+    public IEnumerator Act_HangUpCall()
+    {
+        if (PhoneMessage) PhoneMessage.SetActive(false);
+        if (CloseButton) CloseButton.SetActive(false);
+
+        if (PlayerAnimator != null)
+            PlayerAnimator.SetBool("phone", false);
+
+        yield return new WaitForSeconds(1f);
+    }
+
+    public IEnumerator Act_PickUPPhone()
+    {
+        if (ring01) ring01.SetActive(false);
+        if (ring02) ring02.SetActive(false);
+
+        var a1 = ring01 ? ring01.GetComponent<Animator>() : null;
+        var a2 = ring02 ? ring02.GetComponent<Animator>() : null;
+
+        if (a1) a1.SetBool("ring", false);
+        if (a2) a2.SetBool("ring", false);
+
+        if (PlayerAnimator != null)
+        {
+            PlayerAnimator.SetBool("phone", true);
+            yield return new WaitForSeconds(cControllScript.phone.length);
+        }
+
+        yield return new WaitForSeconds(3);
+        if (PhoneMessage) PhoneMessage.SetActive(false);
+        //if (CloseButton) CloseButton.SetActive(false);
+    }
+
+    public IEnumerator Act_WalkInFromRight()
+    {
+        if (cControllScript == null || middlePoint == null) yield break;
+
+        cControllScript.Target = middlePoint.position;
+        cControllScript.StartAutoMoveTo(cControllScript.Target);
+        yield return new WaitUntil(() => cControllScript.autoMoveFinished);
+    }
+
+    public IEnumerator Act_BoardBus()
+    {
+        if (cControllScript == null || boardBusTarget == null) yield break;
+
+        cControllScript.Target = boardBusTarget.position;
+        cControllScript.autoMoveFinished = false;
+        cControllScript.animator.SetBool("walk", true);
+        cControllScript.isAutoMoving = true;
+
+        yield return new WaitUntil(() => cControllScript.autoMoveFinished);
+
+        // ğŸ”’ é—œé–‰ç©å®¶æ§åˆ¶ï¼Œé¿å…ä¸Šè»Šå¾Œäº‚å‹•
+        cControllScript.playerControlEnabled = false;
+
+        // âœ… é‡é»ï¼šæŠŠç©å®¶è¨­æˆè»Šçš„å­ç‰©ä»¶
+        Player.transform.SetParent(Bus.transform, true);
+
+        cControllScript.animator.SetBool("walk", false);
+    }
+
+    public IEnumerator Act_PhoneRing()
+    {
+        if (ring01) ring01.SetActive(true);
+        if (ring02) ring02.SetActive(true);
+
+        var a1 = ring01 ? ring01.GetComponent<Animator>() : null;
+        var a2 = ring02 ? ring02.GetComponent<Animator>() : null;
+
+        if (a1) a1.SetBool("ring", true);
+        if (a2) a2.SetBool("ring", true);
+
+        yield return new WaitForSeconds(3f);
+    }
+
+    public IEnumerator Act_EyeClose(float seconds = 0.8f)
+    {
+        if (PlayerAnimator != null)
+        {
+            PlayerAnimator.SetBool("eyeclose", true);
+            yield return new WaitForSeconds(2);
+            PlayerAnimator.SetBool("eyeclose", false);
+        }
+    }
+
+    public IEnumerator Act_LightDimDown()
+    {
+        if (fader == null) yield break;
+        yield return StartCoroutine(fader.FadeExposure(1, normalExposure, darkExposure));
+    }
+
+    public IEnumerator Act_LightOn()
+    {
+        if (fader == null) yield break;
+        yield return StartCoroutine(fader.FadeExposure(1, darkExposure, normalExposure));
+    }
+
+    public IEnumerator Act_BlackPanelOn(float duration = 0.8f)
+    {
+        if (fader == null) yield break;
+        BlackPanel.SetActive(true);
+        animationScript.Fade(BlackPanel, 1.5f, 0f, 1f, null);
+        yield return new WaitForSeconds(2f);
+    }
+
+    public IEnumerator Act_BlackPanelOff(float duration = 0.8f)
+    {
+        if (fader == null) yield break;
+        animationScript.Fade(BlackPanel, 1.5f, 1f, 0f, null);
+        yield return new WaitForSeconds(2f);
+        BlackPanel.SetActive(false);
+    }
+
+    public IEnumerator Act_NextScene(string sceneName)
+    {
+        StartCoroutine(fader.FadeExposure(1, normalExposure, darkExposure));
+        yield return new WaitForSeconds(2f);
+        sceneChangeScript.SceneC("01");
+    }
+
+
+    public IEnumerator Act_showPlace()
+    {
+        //1.åœ°é»é¡¯ç¤º
+        Player.transform.position = playerStartPos.position;
         PlaceText.gameObject.SetActive(true);
         animationScript.Fade(PlaceText.gameObject, 2f, 0f, 1f, null);
         yield return new WaitUntil(() => PlaceText.gameObject.GetComponent<CanvasGroup>().alpha == 1);
@@ -98,122 +253,83 @@ public class desC : MonoBehaviour
         yield return new WaitUntil(() => PlaceText.gameObject.GetComponent<CanvasGroup>().alpha == 0);
         yield return new WaitForSeconds(1f);
         PlaceText.gameObject.SetActive(false);
-
-        // 2. 
-        Debug.Log("¥D¨¤¨«¶i³õ´º");
-        cControllScript.Target = new Vector3(-5.81f, -9f,-6.2f);
-        cControllScript.StartAutoMoveTo(cControllScript.Target);
-
-        // µ¥¥L¨«¨ì«ü©w X
-        yield return new WaitUntil(() => cControllScript.autoMoveFinished);
-        PlayerAnimator.SetBool("walk",false);
-
-        //3.
-        Debug.Log("¼½©ñ®³¤â¾÷ªº°Êµe");
-        PlayerAnimator.SetBool("phone", true);
-        yield return new WaitForSeconds(cControllScript.phone.length);
-
-        //4.¼½©ñ¶i¯¸®É¶¡ªº¹ï¸Ü
-        Debug.Log("¼½©ñ¶i¯¸®É¶¡ªº¹ï¸Ü");
-        dialogueSystemDesScript.autoNextLine = true;
-        dialogueSystemDesScript.StartDialogue(dialogueSystemDesScript.Textfile01);
-        yield return new WaitForSeconds(0.5f);
-        yield return new WaitUntil(() => dialogueSystemDesScript.text01Finished);
-        yield return new WaitForSeconds(2f);
-        //¹ï¸Üµ²§ô¡A¤£¬İ¤â¾÷
-        dialogueSystemDesScript.TextPanel.SetActive(false);
-        PlayerAnimator.SetBool("phone", false);
-
-        //5.¼½©ñ½K¬Ü°Êµe
-        Debug.Log("½K¬Ü");
-        PlayerAnimator.SetBool("eyeclose", true);
-        yield return new WaitForSeconds(cControllScript.eyeclose.length);
-        yield return new WaitForSeconds(1.5f);
-
-        //6.¼½©ñ­µ¼ÖÅTªº°Êµe
-        Debug.Log("¼½©ñ­µ¼ÖÅTªº°Êµe");
-        ring01.SetActive(true);
-        ring02.SetActive(true);
-        ring01.GetComponent<Animator>().SetBool("ring", true);
-        ring02.GetComponent<Animator>().SetBool("ring", true);
-        yield return new WaitForSeconds(3f);
-
-        //7.¤£½K¬Ü+¬İ¤â¾÷
-        Debug.Log("¤£½K¬Ü+¬İ¤â¾÷");
-        PlayerAnimator.SetBool("eyeclose", false);
-        PlayerAnimator.SetBool("phone", true);
-        yield return new WaitForSeconds(cControllScript.phone.length);
-
-        //    // 3. 
-        //    Debug.Log("Åã¥Ü¹Ï¤ù Panel");
-        //    PhoneMessage.SetActive(true);
-
-        //    // 4. 
-        //    Debug.Log("¹L´X¬í«á¥X²{¤e¤e");
-        //    yield return new WaitForSeconds(5f);
-        //    CloseButton.SetActive(true);
-
-        //    // 5. 
-        //    Debug.Log("µ¥ª±®a«öÃö³¬");
-        //    bool closed = false;
-        //    CloseButton.GetComponent<Button>().onClick.AddListener(() => closed = true);
-        //    yield return new WaitUntil(() => closed);
-        //    PlayerAnimator.SetBool("phone", false);
-
-        //    //// 6. ¶Â¹õ²H¤J¡]0¡÷1¡^
-        //    //yield return StartCoroutine(animationScript.FadeIn(BlackPanel.GetComponent<CanvasGroup>(), 1f));
-
-        //    // 7. 
-        //    Debug.Log("¤õ¨®¶i¯¸¡]¥Î²¾°Ê¦Ó¤£¬O Animator¡^");
-        //    Train.transform.position = trainStartPoint.position; // ¥ı©ñ¨ì°_©lÂI
-        //    yield return StartCoroutine(MoveToPoint(Train.transform, trainStopPoint.position, trainSpeed));
-        //    yield return new WaitUntil(() =>
-        //Vector3.Distance(Train.transform.position, trainStopPoint.position) < 0.01f);
-
-
-        //    // 8. 
-        //    Debug.Log("¥D¨¤¨«¦V¤õ¨®¡]³Q«e´º sprite ¾B¦í¡A¬İ°_¨Ó¹³¤W¨®¡^");
-        //    cControllScript.Target = new Vector2(-4.1f, 4f);
-        //    cControllScript.StartAutoMoveTo(cControllScript.Target);
-        //    // µ¥¥L¨«¨ì«ü©w X
-        //    yield return new WaitUntil(() => cControllScript.autoMoveFinished);
-        //    PlayerAnimator.SetBool("walk", false);
-        //    cControllScript.rig.bodyType = RigidbodyType2D.Kinematic;
-
-        // 9. 
-        Debug.Log("µe­±¦A¦¸²H¥X¶Â¡]¥i¬Ù²¤¡^");
-        BlackPanel.SetActive(true);
-        animationScript.Fade(
-            BlackPanel, 
-            1f,
-            0f,
-            1f,
-            ()=>sceneChangeScript.SceneC("00"));
-        yield return new WaitForSeconds(1f);
-        BlackPanel.SetActive(false);
-
-        // ¼@±¡¥ş³¡¶]§¹
-        Debug.Log("¼@±¡¥ş³¡¶]§¹");
-        cControllScript.EnablePlayerControl();
-        // 10. ¤Á´«³õ´º
-        SceneManager.LoadScene("00");
     }
-    //²¾°Ê¦ì¸m
-    IEnumerator MoveToPoint(Transform obj, Vector3 targetPos, float speed)
+
+    public IEnumerator Act_BusCome()
     {
-        targetPos.z = obj.position.z; // 2D Âê Z ¶b¡AÁ×§K¶]­¸
+        if (Bus == null || BusStartPoint == null || BusStopPoint == null) yield break;
 
-        while (Vector3.Distance(obj.position, targetPos) > 0.01f)
+        // ç¢ºä¿æ²’è¢«ä¸–ç•Œæ§åˆ¶
+        Bus.transform.SetParent(null, true);
+
+        Bus.SetActive(true);
+        Bus.transform.position = BusStartPoint.position;
+
+        // âœ… è»Šé–‹é€²ç«™
+        while (Vector3.Distance(Bus.transform.position, BusStopPoint.position) > 0.02f)
         {
-            obj.position = Vector3.MoveTowards(
-                obj.position,
-                targetPos,
-                speed * Time.deltaTime
+            Bus.transform.position = Vector3.MoveTowards(
+                Bus.transform.position,
+                BusStopPoint.position,
+                BusSpeed * Time.deltaTime
             );
-
             yield return null;
         }
-        obj.position = targetPos; // ¦¬§Àºë·Ç¶K¨ì¥Ø¼Ğ
+
+        Bus.transform.position = BusStopPoint.position;
+    }
+
+    public IEnumerator Act_BusGo()
+    {
+
+        if (worldScrollerScript != null)
+        {
+            worldScrollerScript.StartMove_Speed(5f);
+        }
+        yield return new WaitForSeconds(3);
+
+    }
+
+    public IEnumerator Act_Inside()
+    {
+        if (outside) outside.SetActive(false);
+        if (inside) inside.SetActive(true);
+
+        // æŠŠç©å®¶ç§»åˆ°å®¤å…§ä½ç½®ï¼ˆå…©ç¨®åšæ³•ä½ é¸ä¸€å€‹ï¼‰
+
+        // âœ…åšæ³•1ï¼šç¬ç§»ï¼ˆæœ€ç©©ã€æœ€ä¸æœƒå¡ï¼‰
+        if (InsidePos != null && cControllScript != null)
+        {
+            Player.transform.position = InsidePos.position;
+        }
+        else if (InsidePos != null)
+        {
+            // å¦‚æœä½ ç©å®¶ä¸æ˜¯ cControllScript é‚£å€‹ç‰©ä»¶ï¼Œå°±æ”¹æˆä½ çš„ Player transform
+            // playerTransform.position = InsidePos.position;
+        }
+
+        yield return new WaitForSeconds(1);
+    }
+
+    public IEnumerator Act_MoveToSit()
+    {
+        if (InsideSitPos == null || cControllScript == null) yield break;
+
+        cControllScript.Target = InsideSitPos.position;
+        cControllScript.StartAutoMoveTo(cControllScript.Target);
+        yield return new WaitUntil(() => cControllScript.autoMoveFinished);
+        yield return new WaitForSeconds(1);
+    }
+
+    public IEnumerator Act_Sleep()
+    {
+        if (PlayerAnimator != null)
+        {
+            PlayerAnimator.SetBool("sitsleep", true);
+        }
+        yield return new WaitForSeconds(cControllScript.sitsleep.length);
+
+        yield return new WaitForSeconds(1);
     }
 
 }
