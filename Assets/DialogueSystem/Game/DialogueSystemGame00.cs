@@ -599,6 +599,10 @@ public class DialogueSystemGame00 : MonoBehaviour
                 yield return owner.Act_PickPhoneOn();
                 break;
 
+            case "HangUpPhone":
+                yield return owner.Act_HangUpPhone();
+                break;
+
             case "BusShake":
                 yield return owner.Act_BusShake(true);
                 break;

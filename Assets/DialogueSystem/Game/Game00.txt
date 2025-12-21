@@ -137,6 +137,6 @@ LightFlicker(燈光閃爍)
 0
 ……算了，先別管那麼多好了。
 1
-BlackPanel2On
+BlackPanelOn2
 1
 ShowTitle_Game_Title(遊戲名稱顯示)

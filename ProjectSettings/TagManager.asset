@@ -53,9 +53,9 @@ TagManager:
   - name: errorPlaceT
     uniqueID: 781531957
     locked: 0
-  - name: UI
-    uniqueID: 2257921981
-    locked: 0
   - name: errorPlace
     uniqueID: 2179302129
+    locked: 0
+  - name: UI
+    uniqueID: 2257921981
     locked: 0

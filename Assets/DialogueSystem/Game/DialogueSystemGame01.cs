@@ -28,6 +28,7 @@ public class DialogueSystemGame01 : MonoBehaviour
     [Header("設定")]
     public bool playOnEnable = false;
     public bool allowFastReveal = true;
+    [Tooltip("允許接收空白鍵")] public bool inputLocked = false;
 
     [Header("自動播放設定")]
     [Tooltip("true 就自動下一行")] public bool autoNextLine = false;
@@ -305,6 +306,12 @@ public class DialogueSystemGame01 : MonoBehaviour
             case "LightDimDown":
                 yield return ownerSecond.Act_LightDimDown();
                 break;
+
+            case "SelectRound": 
+                yield return ownerSecond.Act_SelectRound(); 
+                break;
+
+            
 
             default:
                 Debug.LogWarning("[DialogueSystemGame00] Unhandled action key: " + actionKey);

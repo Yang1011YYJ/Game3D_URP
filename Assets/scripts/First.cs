@@ -244,6 +244,7 @@ public class First : MonoBehaviour
         currentPhase = GamePhase.Teaching;   // ✅ 教學正式啟動
         _teachingRunning = true;
         _teachingDone = false;
+        inTeach01 = false;
         if (teachRoutine != null) return;
         teachRoutine = StartCoroutine(Teach2Routine());
     }
@@ -282,29 +283,6 @@ public class First : MonoBehaviour
     // 🎮 正式遊戲流程
     // =====================================================
 
-    private IEnumerator StartNormalRound()//開始正式遊戲
-    {
-        Debug.Log("[First] Normal round start");
-
-        currentPhase = GamePhase.Playing;
-
-        EnablePhotoFrameFollow();
-        HideTeachHint();
-
-        countText.gameObject.SetActive(true);
-        // 開回合
-        spotManager.BeginRound();
-
-        // Timer 超時 = 當成失誤
-        timer.onTimeUp = () =>
-        {
-            Debug.Log("[First] Timeout");
-            spotManager.OnTimeout();
-        };
-
-        timer.StartCountdown(roundSeconds);
-        yield return null;
-    }
 
     // =====================================================
     // 📡 SpotManager 事件回調
@@ -453,11 +431,11 @@ public class First : MonoBehaviour
         
         yield return new WaitForSeconds(1f);
         animationScript.Fade(ErrorPanel, 2, 1, 0, null);
-
+        PicturePanel.gameObject.SetActive(false);
         dialogueSystemGame00Script.inputLocked = false; // 教學結束
         yield return new WaitForSeconds(3f);
         CleanupRoundUI();
-        PicturePanel.gameObject.SetActive(false);
+        
         // ✅如果是在教學，就在這裡結束教學並放行劇情
         if (currentPhase == GamePhase.Teaching)
         {
@@ -494,8 +472,6 @@ public class First : MonoBehaviour
         if (BlackPanel22 != null) BlackPanel22.SetActive(false);
         if (ErrorPanel != null) ErrorPanel.SetActive(false);
         if (RedPanel != null) RedPanel.SetActive(false);
-        if (PhotoFrameImage != null) PhotoFrameImage.SetActive(false);
-        if (HintText != null) HintText.gameObject.SetActive(false);
         if (PicturePanel != null) PicturePanel.SetActive(false);
         if (GameName != null) GameName.SetActive(false);
         if (Timetext != null) Timetext.SetActive(false);
@@ -513,22 +489,6 @@ public class First : MonoBehaviour
     // =====================================================
     // 📷 拍照框控制（你專案原本就有的概念）
     // =====================================================
-
-    private void EnablePhotoFrameFollow()//拍照框跟隨滑鼠
-    {
-        if (PhotoFrameImage != null)
-            PhotoFrameImage.SetActive(true);
-
-        photoFrameFollowEnabled = true;
-
-        // ⚠️ 如果教學自動移動還在跑，先停掉
-        if (photoFrameMoveRoutine != null)
-        {
-            StopCoroutine(photoFrameMoveRoutine);
-            photoFrameMoveRoutine = null;
-        }
-        // TODO：如果你是用 Update 跟隨滑鼠，這裡只要開旗標
-    }
 
     private void DisablePhotoFrameFollow()//拍照框不能跟隨滑鼠
     {
@@ -622,12 +582,6 @@ public class First : MonoBehaviour
         }
     }
 
-    private void HideTeachHint()//教學文字關掉
-    {
-        if (HintText != null)
-            HintText.gameObject.SetActive(false);
-    }
-
     public IEnumerator Act_BusLightBright()
     {
         //3.車頂燈光閃爍
@@ -686,13 +640,13 @@ public class First : MonoBehaviour
     {
         if (PhonePanel) PhonePanel.SetActive(false);
 
-        //if (cControllScript.animator != null)
-        //    cControllScript.animator.SetBool("phone", false);
+        if (cControllScript.animator != null)
+            cControllScript.animator.SetBool("phone", false);
 
-        cControllScript.animator.Play("phone", 0, 1f);   // 從最後一幀開始
-        cControllScript.animator.speed = -1f;          // 反向播放
-        yield return new WaitUntil(() => cControllScript.animator.GetCurrentAnimatorStateInfo(0).normalizedTime <= 0f);
-        cControllScript.animator.speed = 1f; // 記得還原
+        //cControllScript.animator.Play("phone", 0, 1f);   // 從最後一幀開始
+        //cControllScript.animator.speed = -1f;          // 反向播放
+        //yield return new WaitUntil(() => cControllScript.animator.GetCurrentAnimatorStateInfo(0).normalizedTime <= 0f);
+        //cControllScript.animator.speed = 1f; // 記得還原
 
 
         yield return new WaitForSeconds(1f);
@@ -874,7 +828,7 @@ public class First : MonoBehaviour
     {
         //指定ShowTimeText為19:30
         Timetext.gameObject.SetActive(true);
-        Timetext.GetComponent<Text>().text = time;
+        Timetext.GetComponent<TextMeshProUGUI>().text = time;
         yield return new WaitForSeconds(1.5f);
     }
     public IEnumerator Act_ShowPhoto(GameObject target)
@@ -914,6 +868,7 @@ public class First : MonoBehaviour
         // 先全關
         foreach (Transform child in PicturePanel.transform)
             child.gameObject.SetActive(false);
+        Picture02.SetActive(false);
         PicturePanel.SetActive(false);
         yield return null;
     }
