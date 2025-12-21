@@ -1,96 +1,145 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using TMPro;
-using Unity.VisualScripting.Antlr3.Runtime.Misc;
+﻿using System;
 using UnityEngine;
-using UnityEngine.UI;
 
+public enum RoundEndType
+{
+    FoundSpot,
+    FailedRound
+}
 public class SpotManager : MonoBehaviour
 {
-    [Header("Round Owner")]
-    public Second second; // 在 Inspector 拖 Second 進來
+    [Header("Game Rules")]
+    public int totalRounds = 8;
+    public int needFoundToWin = 5;
+    public int mistakesPerRound = 2;
 
+    [Header("Runtime (Read Only)")]
+    [SerializeField] public int roundIndex = 0;     // 目前第幾回合（1~8）
+    [SerializeField] public int totalFound = 0;     // 目前總共找到幾個（0~8）
+    [SerializeField] public int mistakesLeft = 0;   // 本回合剩幾次機會（2->1->0）
+    [SerializeField] private bool roundRunning = false;
+    [SerializeField] private bool spotFoundThisRound = false;
 
-    public List<DifferenceSpot> activeSpots = new List<DifferenceSpot>();// 自動抓，不用手動填
+    // 事件給 First/Second 接演出
+    public event Action<int, int> OnRoundBegan;                  // (roundIndex, mistakesLeft)
+    public event Action<int, int> OnMistakeChanged;              // (roundIndex, mistakesLeft)
+    public event Action<int, int, RoundEndType> OnRoundEnded;    // (roundIndex, totalFound, endType)
+    public event Action<int> OnTotalFoundChanged;                // (totalFound)
 
-    public int totalCount;          // 總共有幾個 spot
-    public int foundCount;          // 已經找到幾個
-                                    // Start is called before the first frame update
-                                    // 自動抓場景中所有 DifferenceSpot（包含沒啟用的，用 true）
-    [Header("UI")]
-    public TextMeshProUGUI text;//計算數量
-
-    void Awake()
+    // ✅ 劇情：開始一回合（不會自動開 timer）
+    public void BeginRound()
     {
-        text.gameObject.SetActive(false);
-    }
-    public void RefreshActiveSpots()
-    {
-        activeSpots.Clear();
+        if (IsGameEnded()) return;
 
-        DifferenceSpot[] allSpots = FindObjectsOfType<DifferenceSpot>(true);
+        roundIndex++;
+        mistakesLeft = mistakesPerRound;
+        spotFoundThisRound = false;
+        roundRunning = true;
 
-        foreach (var s in allSpots)
-        {
-            if (s.gameObject.activeInHierarchy)
-            {
-                activeSpots.Add(s);
-
-                s.manager = this;
-                s.second = second;   // ✅ 綁 Second
-                s.ResetSpot();
-            }
-        }
-
-        totalCount = activeSpots.Count;
-        foundCount = 0;
-
-        if (text != null)
-            text.text = $"{foundCount} / {totalCount}";
-
-        Debug.Log($"[SpotManager] 總共有 {totalCount} 個可以找的地方");
+        OnRoundBegan?.Invoke(roundIndex, mistakesLeft);
+        OnMistakeChanged?.Invoke(roundIndex, mistakesLeft);
+        OnTotalFoundChanged?.Invoke(totalFound);
     }
 
-    //被 DifferenceSpot 呼叫：某個 spot 被找到時進來
-    public void OnSpotFound(DifferenceSpot spot)
+    // ✅ 劇情：如果你想「同一回合重來」(例如你做完演出後才允許繼續點)
+    public void ResumeRound()
     {
-        if (!activeSpots.Contains(spot))
+        if (IsGameEnded()) return;
+        if (spotFoundThisRound) return;
+        roundRunning = true;
+    }
+
+    public void PauseRound()
+    {
+        roundRunning = false;
+    }
+
+    //// 入口1：點到 spot
+    //public void OnSpotClicked()
+    //{
+    //    if (currentPhase == GamePhase.Teaching)
+    //    {
+    //        OnTeachSpotClicked();
+    //        return;
+    //    }
+
+    //    if (currentPhase == GamePhase.Playing)
+    //    {
+    //        OnPlaySpotClick();
+    //        return;
+    //    }
+        
+    //}
+    //遊戲的
+    public void OnPlaySpotClick()
+    {
+        if (!roundRunning) return;
+        if (spotFoundThisRound) return;
+
+        spotFoundThisRound = true;
+        roundRunning = false;
+
+        totalFound++;
+        OnTotalFoundChanged?.Invoke(totalFound);
+
+        OnRoundEnded?.Invoke(roundIndex, totalFound, RoundEndType.FoundSpot);
+    }
+
+    //教學的
+    //public void OnTeachSpotClicked()
+    //{
+    //    Debug.Log("[Teach] Spot clicked!");
+
+        
+
+    //    // 如果你的教學是用 Dialogue index 推進：
+    //    // dialogueSystemGame00Script.NextLine();  // ← 依你系統實作
+    //    Act_RequestTeach2(); // 或者你要接 Teach2
+    //}
+
+
+    // 入口2：點到背景
+    public void OnBackgroundClicked()
+    {
+        if (!roundRunning) return;
+        if (spotFoundThisRound) return;
+
+        ApplyMistake();
+    }
+
+    // 入口3：超時（由 TimeControll.onTimeUp 呼叫進來）
+    public void OnTimeout()
+    {
+        if (!roundRunning) return;
+        if (spotFoundThisRound) return;
+
+        ApplyMistake();
+    }
+
+
+    private void ApplyMistake()
+    {
+        mistakesLeft--;
+        OnMistakeChanged?.Invoke(roundIndex, mistakesLeft);
+
+        if (mistakesLeft > 0)
         {
-            Debug.Log($"[SpotManager] 不在 active 列表內的 spot：{spot.name}");
+            // ✅ 還有機會：回合仍在進行中，但「要不要立刻重新開始計時」由劇情決定
+            // SpotManager 不碰 timer
             return;
         }
 
-        foundCount++;
-
-        if (text != null)
-            text.text = $"{foundCount} / {totalCount}";
-
-        Debug.Log($"[SpotManager] 找到第 {foundCount} 個，進度：{foundCount}/{totalCount}");
-
-        if (foundCount >= totalCount)
-        {
-            Debug.Log("[SpotManager] 全部找完啦！");
-
-        }
+        // ✅ 本回合失敗
+        roundRunning = false;
+        OnRoundEnded?.Invoke(roundIndex, totalFound, RoundEndType.FailedRound);
     }
 
-    public void ClearAllCircles()
-    {
-        CircleFill[] circles = FindObjectsOfType<CircleFill>(true);
+    // 狀態查詢
+    public bool IsWin() => totalFound >= needFoundToWin;
+    public bool IsGameEnded() => IsWin() || roundIndex >= totalRounds;
 
-        foreach (var c in circles)
-        {
-            Destroy(c.gameObject);
-        }
-
-        Debug.Log("[SpotManager] 已清掉所有標記圈圈");
-    }
-    public void SetSpotsInteractable(bool on)
-    {
-        foreach (var s in activeSpots)
-        {
-            var btn = s.GetComponent<Button>();
-            if (btn != null) btn.interactable = on;
-        }
-    }
+    public int RoundIndex => roundIndex;
+    public int TotalFound => totalFound;
+    public int MistakesLeft => mistakesLeft;
+    public bool RoundRunning => roundRunning;
 }

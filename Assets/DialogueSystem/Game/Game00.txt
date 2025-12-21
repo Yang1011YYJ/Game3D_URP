@@ -45,7 +45,7 @@ eyeclose
 0
 該不會是我眼花了……
 1
-BlackPanelOn
+BlackPanelShutOff
 0
 ？！
 1
@@ -61,9 +61,9 @@ PickPhoneOn
 1
 Label_MUST_Teach1Start
 1
-InTeach
+InTeach01(指定目前是教學1)
 1
-WaitForTeach(教學中，等回到遊戲畫面繼續對話)
+GameStart(開始遊戲，會判斷這是不是教學:教學中，等回到遊戲畫面繼續對話)
 0
 ！
 1
@@ -91,6 +91,8 @@ bigpicture(會有target放在照片的某個位置，放大那個target的部分
 0
 我拍照的時候……有看到這個嗎？
 1
+photoclose
+1
 LightFlicker(燈光閃爍)
 0
 又……又來了？
@@ -105,7 +107,9 @@ BusShake
 1
 Label_MUST_Teach2Start
 1
-Tutorial_AnomalyAppear(進入教學2，教學中，等回到遊戲畫面繼續對話)
+InTeach02(進入教學2)
+1
+GameStart(開始遊戲，會判斷這是不是教學:教學中，等回到遊戲畫面繼續對話)
 0
 就是這個……！
 1

@@ -18,21 +18,22 @@ public class TimeControll : MonoBehaviour
         if (timerText != null) timerText.gameObject.SetActive(false);
     }
 
-    public void StartCountdown(int seconds)
+    public void StartCountdown(int seconds)//開始
     {
         ForceEnd();
+        if (timerText != null) timerText.gameObject.SetActive(true);
         countdownRoutine = StartCoroutine(Countdown(seconds));
     }
 
-    public void ForceEnd()
+    public void ForceEnd()//停止
     {
         if (countdownRoutine != null)
             StopCoroutine(countdownRoutine);
-
+        if (timerText != null) timerText.gameObject.SetActive(false);
         ResetTimer();
     }
 
-    private IEnumerator Countdown(int totalSeconds)
+    private IEnumerator Countdown(int totalSeconds)//計時功能
     {
         isRunning = true;
         currentTime = totalSeconds;
@@ -57,23 +58,23 @@ public class TimeControll : MonoBehaviour
         ResetTimer();
     }
 
-    private void ResetTimer()
+    private void ResetTimer()//重置
     {
         isRunning = false;
         currentTime = 0;
 
         if (timerText != null)
             timerText.text = FormatTime(0);
-
+        if (timerText != null) timerText.gameObject.SetActive(false);
         countdownRoutine = null;
     }
 
-    protected virtual void OnCountdownEnd()
+    protected virtual void OnCountdownEnd()//到屬結束
     {
         Debug.Log("倒數結束！");
         onTimeUp?.Invoke();
     }
-    string FormatTime(int totalSeconds)
+    string FormatTime(int totalSeconds)//文字設計
     {
         int minutes = totalSeconds / 60;
         int seconds = totalSeconds % 60;

@@ -1,1371 +1,654 @@
 ﻿using System.Collections;
-using System.Collections.Generic;
-using TMPro;
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.EventSystems;
-using UnityEngine.Experimental.GlobalIllumination;
-using UnityEngine.U2D;
+using TMPro;
 using UnityEngine.UI;
-using static DialogueSystemGame00;
-using static UnityEngine.GraphicsBuffer;
 
-
-
-public enum SceneCheckpoint
+public enum GamePhase
 {
-    Start = 0,
-    AfterFadeIn = 10,
-    AfterCameraMove = 20,
-    AfterRoofBlink = 30,
-    AfterDialogue = 40,
-    AfterTeach1 = 50,
-    AfterTeach2 = 60
+    Teaching,
+    Playing,
+    End
 }
 
 public class First : MonoBehaviour
 {
-
-    [System.Serializable]
-    private class TeachingSnapshot
-    {
-        public bool playerActive;
-        public bool playerControl;
-
-        public bool phonePanelActive;
-        public bool blackPanelActive;
-
-        public bool errorPanelActive;
-        public bool errorPlaceActive;
-        public bool circlePlaceActive;
-
-        public bool hintActive;
-        public bool photoFrameActive;
-        public bool correctPanelActive;
-        public bool wrongPanelActive;
-        public bool smileActive;
-
-        public bool photoPanelActive;
-        public bool titlePanelActive;
-        public bool timeTextActive;
-
-        public float exposure;         // 需要 fader 提供 getter
-        public Color errorLightColor;
-
-        public Vector3 camPos;
-    }
-    private TeachingSnapshot _teachSnap;
+    [Header("Phase")]
+    public GamePhase currentPhase = GamePhase.Teaching;
 
     [Header("腳本")]
-    public AnimationScript animationScript;
-    public CControll cControllScript;
-    [Tooltip("場景中負責計算找錯誤數量的管理員")]public SpotManager spotManager;
+    public SpotManager spotManager;
     public TimeControll timer;
-    public CameraMoveControll cameraMoveControllScript;
-    public FadeInByExposure fader;
     public DialogueSystemGame00 dialogueSystemGame00Script;
-    public WorldScroller worldScrollerScript;
+    public FadeInByExposure fader;
+    public CControll cControllScript;
+    public AnimationScript animationScript;
+    public SceneChange sceneChangeScript;
 
-    [Header("異常相關")]
-    [Tooltip("異常畫面的背景")]public GameObject ErrorPanel;
-    [Tooltip("設定異常的位置組")] public GameObject ErrorPlace;
-    [Tooltip("設定異常的圈圈")] public GameObject CirclePlace;
-    //[Tooltip("教學-設定異常的圈圈")] public GameObject CirclePlaceTeach;
-    [Tooltip("異常光線")] public Light ErrorLight;
-    public bool StartError;
-    [Tooltip("開始找錯")] public bool ErrorStart;
-    [Tooltip("異常觸發")] public bool eT1;
-    [Tooltip("異常數量")]public int errorTotal = 10;
-    [Tooltip("笑臉")]public Transform smileTf;
-
-    [Header("玩家")]
-    public GameObject Player;
-    [Tooltip("玩家教學用自動走到的位置")]/*public Vector2 teachTargetPos = new Vector2(19.3f, -4.3f);*/public Transform WalkToFrontPos;
-    [Tooltip("玩家起始出現的位置")]public Transform PlayerStartPos;
-    public Transform targetPoint;
+    [Header("遊戲用UI")]
+    public GameObject ErrorPanel;
+    public GameObject RedPanel;
+    public GameObject PhotoFrameImage;
+    public TextMeshProUGUI HintText;
+    public GameObject PicturePanel;
+    public GameObject Picture01;
+    public GameObject Picture02;
+    [Tooltip("Round UI")]
+    public TextMeshProUGUI countText; // 顯示「找到 X / >5」
 
 
-    [Header("相機")]
-    //public Transform TargetPoint;
-    //public Transform StartPoint;
-    //public float MoveSpeed =5f;
-    public float lightUPDuration = 1.2f;
-    [Header("Big Picture Zoom (Perspective Camera)")]
-    [Tooltip("照片上對焦的「空物件」")]public Transform bigPictureTarget;      // 照片上對焦的「空物件」
-    [Tooltip("推進/拉回時間")] public float zoomDuration = 0.8f;        // 推進/拉回時間
-    [Tooltip("放大後停留秒數")] public float zoomHoldTime = 3f;           // 放大後停留秒數
-    [Tooltip("相機往前推的距離")] public float zoomDistance = 2.5f;         // 相機往前推的距離
+    [Header("其他UI")]
+    public GameObject PhonePanel;
+    [Tooltip("玩家對話框還看的到")]public GameObject BlackPanel;
+    [Tooltip("玩家對話框看不到")] public GameObject BlackPanel22;
+    [Tooltip("遊戲名字")] public GameObject GameName;
+    [Tooltip("遊戲內劇情用的時間")] public GameObject Timetext;
+
+    [Header("Big Picture Zoom放大圖片功能")]
+    public Transform BigPictureZoomTarget;
+    public Camera mainCamera;
+    public float zoomDistance = 2.5f;
+    public float zoomDuration = 0.8f;
+    public float zoomHoldTime = 2f;
 
 
-    [Header("拍照框點擊狀態")]
-    public bool photoFrameClicked = false;
+    [Header("Photo Frame Follow")]
+    [Tooltip("拍照框本體")] public RectTransform PhotoFrameRect;     // 拍照框本體
+    public Canvas UICanvas;                  // UI Canvas
+    [Tooltip("拍照框跟隨速度")] public float photoFrameFollowSpeed = 18f;
+    [Tooltip("拍照框自動移動速度")] public float photoFrameAutoMoveSpeed = 900f;
+    // 教學用目標（UI 或世界座標都可以）
+    [Tooltip("教學用目標")]public Transform PhotoFrameTeachTarget;
+    [Tooltip("第一次教學用目標")] public Transform PhotoFrameTeachTarget01;
+    [Tooltip("第二次教學用目標")] public Transform PhotoFrameTeachTarget02;
+
+    // 內部旗標
+    [Tooltip("是否開啟拍照框跟隨滑鼠")] private bool photoFrameFollowEnabled = false;
+    private Coroutine photoFrameMoveRoutine;
 
     [Header("燈光")]
     public GameObject BusUpLightTotal;
 
-    [Header("教學")]
-    [Tooltip("查看教學")] public bool CheckTeach = false;
-    [Tooltip("系統提是文字")] public TextMeshProUGUI HintText;
-    [Header("教學拍照框 (UI)")]
-    [Tooltip("拍照框 Image（UI）")] public RectTransform PhotoFrameRect;
-    [Tooltip("拍照框的 Image（用來開關）")] public Image PhotoFrameImage;
-    [Tooltip("教學：拍照框先自動移動到的目標（UI Transform）")] public Transform PhotoFrameTeachTarget;
-    [Tooltip("拍照框自動移動速度")] public float photoFrameAutoMoveSpeed = 900f;
-    [Tooltip("拍照框跟隨指標速度")] public float photoFrameFollowSpeed = 18f;
-    public Coroutine teachRoutine;
-    private bool requestTeach1 = false;
-    private bool requestTeach2 = false;
-    public void RequestTeach1() => requestTeach1 = true;
-    public void RequestTeach2() => requestTeach2 = true;
+    [Header("玩家相關")]
+    public GameObject Player;
+    public GameObject PlayerWithAni;
+    [Tooltip("跑到前面去看司機")]public Transform WalkToFrontPos;
+    public Transform PlayerStartPos;
+
+    [Header("車子相關")]
+    [Tooltip("車子本體")] public Rigidbody busRb;
+    [Header("Bus Shake (Visual Only)")]public Transform busVisualRoot; // ✅只放視覺公車，不含地板碰撞
 
 
-    [Header("UI Raycaster")]
-    public Canvas UICanvas;                       // 你的 UI Canvas
-    public GraphicRaycaster uiRaycaster;          // Canvas 上的 GraphicRaycaster
-    public EventSystem eventSystem;               // 場景 EventSystem
+    [Header("Game Settings")]
+    public int roundSeconds = 15;
+    // ===== Round gate: 讓 Act_GameStart 等到回合結束才放行 =====
+    private bool _roundFinished = false;
+    private bool _roundFlowDone = false;
+    private RoundEndType _lastEndType;
 
-    [Header("拍照結果面板")]
-    public GameObject WrongPhotoPanel;            // 可選：如果你也想有錯誤面板
-
-
-    [Header("手機 UI")]
-    [Tooltip("顯示在畫面上的手機介面 Panel")]public GameObject PhonePanel;
-    [Tooltip("手機裡的『相機』按鈕")]public UnityEngine.UI.Button CameraButton;
-    [Tooltip("紀錄玩家有沒有按相機")]public bool hasPressedCamera = false;
-
-    [Header("拍照流程")]
-    [Tooltip("正確照片顯示的 Panel")] public GameObject CorrectPhotoPanel;          // 正確照片顯示的 Panel
-    [Tooltip("快門按鈕（拍照按鈕）")] public Button ShutterButton;                  // 快門按鈕（拍照按鈕）
-    [Tooltip("玩家有沒有按快門")] public bool hasPressedShutter = false;        // 玩家有沒有按快門
-    [Tooltip("拍照後要接的對話腳本（可選）")] public TextAsset TextfileAfterPhoto;          // 拍照後要接的對話腳本（可選）
-    [Header("照片顯示")]
-    [Tooltip("顯示照片的 Panel（可選，用來整組開關）")]
-    public GameObject PhotoPanel;
-
-    [Tooltip("照片槽位：元素0=01、元素1=02...（把 picture01、picture02 依序拖進來）")]
-    public Image[] pictures;
+    [Header("教學相關")]
+    public bool _teachingRunning = false;
+    public bool _teachingDone = false;
+    public bool inTeach01 = false;
 
 
-    [Header("其他")]
-    public GameObject BlackPanel;//黑色遮罩
-    public GameObject BlackPanel22;//黑色遮罩
-    [Tooltip("控制紅光閃爍的協程")] Coroutine warningCoroutine;
-    [Header("遊戲失敗")]
-    [Tooltip("紅色面板")]public GameObject RedPanel;
-    [Tooltip("時間顯示")] public TextMeshProUGUI timetext;
-    [Tooltip("遊戲名稱")] public GameObject TitlePanel;
-    [Tooltip("失敗次數")] public int Mistake;
-    // 避免重複判定，用一個旗標
-    [Tooltip("避免重複判定")]public bool errorResultHandled = false;
-    
-    [Header("車子")]
-    [Tooltip("車子本體父物件")]public Transform busRoot; // Inspector 指到你的
-    public Rigidbody busRb;
-
-
-    public void RequestJump(SceneCheckpoint target)
+    private void Awake()
     {
-        dialogueSystemGame00Script.jumpRequested = true;
-        dialogueSystemGame00Script.jumpTarget = target;
-    }
+        if (spotManager == null)
+            spotManager = FindAnyObjectByType<SpotManager>();
 
+        if (timer == null)
+            timer = FindAnyObjectByType<TimeControll>();
 
-    private enum FlowStage
-    {
-        Cutscene,        // 劇情段（可跳）
-        Teaching,        // 教學段（先不給跳）
-    }
-    private FlowStage stage = FlowStage.Cutscene;
+        dialogueSystemGame00Script = FindAnyObjectByType<DialogueSystemGame00>();
+        fader = FindAnyObjectByType<FadeInByExposure>();
+        cControllScript = FindAnyObjectByType<CControll>();
+        animationScript = FindAnyObjectByType<AnimationScript>();
+        sceneChangeScript = FindAnyObjectByType<SceneChange>();
 
-    private Coroutine sceneFlowRoutine;
-    private void OnDisable()
-    {
-        Debug.LogWarning($"[First] OnDisable !!!  id={GetInstanceID()}  frame={Time.frameCount}");
-    }
-
-    private void OnDestroy()
-    {
-        Debug.LogWarning($"[First] OnDestroy !!!  id={GetInstanceID()}  frame={Time.frameCount}");
+        if (dialogueSystemGame00Script != null)
+            dialogueSystemGame00Script.BindOwner(this);
     }
 
     private void OnEnable()
     {
-        Debug.Log($"[First] OnEnable id={GetInstanceID()}");
+        if (spotManager != null)
+            spotManager.OnRoundEnded += HandleRoundEnded;
     }
 
-    private void Awake()
+    private void OnDisable()
     {
-        animationScript = GetComponent<AnimationScript>();
-        timer = FindAnyObjectByType<TimeControll>();
-        cameraMoveControllScript = FindAnyObjectByType<CameraMoveControll>();
-        fader = FindAnyObjectByType<FadeInByExposure>();
-        worldScrollerScript = FindAnyObjectByType<WorldScroller>();
-        dialogueSystemGame00Script = FindAnyObjectByType<DialogueSystemGame00>();
-        if (cControllScript == null)
-        {
-            cControllScript = FindAnyObjectByType<CControll>();
-        }
-        if (spotManager == null)
-        {
-            spotManager = FindAnyObjectByType<SpotManager>();
-        }
-        if (UICanvas == null) UICanvas = FindAnyObjectByType<Canvas>();
-        if (uiRaycaster == null && UICanvas != null) uiRaycaster = UICanvas.GetComponent<GraphicRaycaster>();
-        if (eventSystem == null) eventSystem = FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>();
-        if (dialogueSystemGame00Script != null)
-            dialogueSystemGame00Script.BindOwner(this);
+        if (spotManager != null)
+            spotManager.OnRoundEnded -= HandleRoundEnded;
     }
+
     private void Start()
     {
-        ErrorPanel.SetActive(false);
-        ErrorPlace.SetActive(false);
-        //CirclePlaceTeach.SetActive(false);
-        CirclePlace.SetActive(false);
-        timetext.gameObject.SetActive(false);
-        TitlePanel.SetActive(false);
-        PhotoPanel.SetActive(false);
-        RedPanel.SetActive(false);
-        BlackPanel.SetActive(false);
-        BlackPanel22.SetActive(false);
-        smileTf.gameObject.SetActive(false);
-        BusUpLightTotal.SetActive(true);
-        ErrorLight.color = new Color(1, 0, 0, 0);
-        if (PhotoFrameImage != null) PhotoFrameImage.gameObject.SetActive(false);
-        if (WrongPhotoPanel != null) WrongPhotoPanel.SetActive(false);
-        if (HintText != null) HintText.gameObject.SetActive(false);
+        CleanupUI();//關掉所有UI
+        //教學UI關掉
+        CleanupRoundUI();
+        PhotoFrameTeachTarget01.gameObject.SetActive(false);
+        PhotoFrameTeachTarget02.gameObject.SetActive(false);
+        inTeach01 = false;
 
-        if (PhonePanel != null)
-            PhonePanel.SetActive(false);
-
-        hasPressedCamera = false;
-
-        eT1 = false;
-        ErrorStart = false;
-        if (CorrectPhotoPanel != null)
-            CorrectPhotoPanel.SetActive(false);
-
-        hasPressedShutter = false;
-
-        worldScrollerScript.StartMove_Speed(5f);
-
-        // 整個場景流程交給協程控制，Start 只負責開頭
-        sceneFlowRoutine = StartCoroutine(SceneFlow());
-
+        //更新數量
+        TotalFoundChangedUI(spotManager.totalFound);
 
     }
 
-    public void OnShutterButtonClicked()
+    private void Update()
     {
-        Debug.Log("[First] 玩家按下快門（拍照）");
-        hasPressedShutter = true;
-    }
-
-    //public IEnumerator PhotoStoryFlow()
-    //{
-    //    // A) 打開 error 面板（你原本就有）
-    //    openErrorPanel();
-
-    //    // B) 等面板淡入完成（你原本也是用 alpha 等）
-    //    var cg = ErrorPanel.GetComponent<CanvasGroup>();
-    //    if (cg != null)
-    //        yield return new WaitUntil(() => cg.alpha >= 1f);
-
-    //    // C) 系統提示文字顯示（看你文字在哪裡，這裡用對話系統示範）
-    //    // 你可以換成 ErrorPanel 裡的 TMP 文字也行
-    //    // 例：dialogueSystemGame00Script.StartDialogue(dialogueSystemGame00Script.TextfileXXX);
-    //    // yield return new WaitUntil(() => dialogueSystemGame00Script.FirstDiaFinished);
-
-    //    // D) 等玩家按下快門
-    //    hasPressedShutter = false;
-    //    if (ShutterButton != null)
-    //        ShutterButton.interactable = true;
-
-    //    yield return new WaitUntil(() => hasPressedShutter);
-
-    //    if (ShutterButton != null)
-    //        ShutterButton.interactable = false;
-
-    //    // E) 閃光：fader 持續 1 秒（0.1 秒爆亮 + 0.9 秒回復）
-    //    // 你可以依你專案曝光值微調
-    //    float baseExposure = 0.5f;   // 你前面 FadeExposure 結束是 0.5
-    //    float flashExposure = 2.5f;  // 閃光更亮
-
-    //    // 先瞬間變亮（很短）
-    //    yield return StartCoroutine(fader.FadeExposure(0.1f, baseExposure, flashExposure));
-    //    // 再回復（把剩下時間用掉）
-    //    yield return StartCoroutine(fader.FadeExposure(0.9f, flashExposure, baseExposure));
-
-    //    // F) 正確照片 Panel 出現
-    //    if (CorrectPhotoPanel != null)
-    //    {
-    //        CorrectPhotoPanel.SetActive(true);
-    //        // 你如果想淡入，也可以用 animationScript.Fade(CorrectPhotoPanel, ……)
-    //    }
-
-    //    // G) 繼續對話
-    //    if (TextfileAfterPhoto != null)
-    //    {
-    //        dialogueSystemGame00Script.StartDialogue(TextfileAfterPhoto);
-    //        yield return new WaitUntil(() => dialogueSystemGame00Script.FirstDiaFinished);
-    //    }
-    //}
-
-    private void ApplyCheckpointState(SceneCheckpoint cp)
-    {
-        // --- 共通：把一些可能殘留的協程效果停掉/歸零 ---
-        if (warningCoroutine != null) { StopCoroutine(warningCoroutine); warningCoroutine = null; }
-
-        // UI/面板先收乾淨（避免跳過時殘留）
-        if (HintText != null) HintText.gameObject.SetActive(false);
-        if (PhotoFrameImage != null) PhotoFrameImage.gameObject.SetActive(false);
-        if (CorrectPhotoPanel != null) CorrectPhotoPanel.SetActive(false);
-        if (WrongPhotoPanel != null) WrongPhotoPanel.SetActive(false);
-        if (ErrorPanel != null) ErrorPanel.SetActive(false);
-        if (ErrorPlace != null) ErrorPlace.SetActive(false);
-        if (CirclePlace != null) CirclePlace.SetActive(false);
-        if (PhonePanel != null) PhonePanel.SetActive(false);
-        if (smileTf != null) smileTf.gameObject.SetActive(false);
-
-        // 紅光：一般劇情到 Teach1 結束後應該回到原本（你預設 alpha=0）
-        if (ErrorLight != null)
-        {
-            var c = ErrorLight.color;
-            c.a = 0f;
-            ErrorLight.color = c;
-        }
-
-        // 曝光：你的 SceneFlow 開頭最後是 0.5
-        // ⚠️ 最穩：直接把曝光設到終點（不要再 FadeExposure）
-        if (fader != null) fader.SetExposureImmediate(0.5f);
-        // ↑ 你需要在 FadeInByExposure 裡加一個 SetExposureImmediate(float v)（下面我給你）
-
-        // 相機：劇情正常走完鏡頭會到 TargetPoint
-        //if (cameraMoveControllScript != null && cameraMoveControllScript.cam != null && TargetPoint != null)
-        //{
-        //    cameraMoveControllScript.cam.transform.position = TargetPoint.position;
-        //}
-
-        // --- 依 checkpoint 決定玩家/控制狀態 ---
-        // 在你原本流程：對話後會把玩家藏起來、鎖控制，然後進 Teach1/Teach2
-
-        dialogueSystemGame00Script.currentCP = cp;
+        if (photoFrameFollowEnabled)
+            FollowPointer(PhotoFrameRect);
     }
 
 
-    IEnumerator AbnormalCaptureFlow(Transform targetTf, bool darkFirst, bool showSmile, float waitSmileSeconds)
+    // =====================================================
+    // 🎬 劇情呼叫入口
+    // =====================================================
+
+    /// <summary>
+    /// 由對話 / 劇情呼叫（gamestart）
+    /// </summary>
+    public IEnumerator Act_GameStart()//開始遊戲(狀態辨識)
     {
-        // ✅ 進教學第一刻：拍快照（只拍一次，不要每一段都拍）
-        if (_teachSnap == null) CaptureBeforeTeaching();
+        // 每次開始一回合前，重置閘門
+        _roundFinished = false;
+        _roundFlowDone = false;
 
-        // 先鎖玩家、藏玩家
-        if (Player != null) Player.SetActive(false);
-        if (cControllScript != null) cControllScript.playerControlEnabled = false;
-        if (PhonePanel != null) PhonePanel.SetActive(false);
+        ErrorPanel.SetActive(true);
+        animationScript.Fade(ErrorPanel, 1, 0, 1, null);
+        PhotoFrameImage.gameObject.SetActive(true);
+        PhotoFrameTeachTarget.gameObject.SetActive(true);
+        PhonePanel.gameObject.SetActive(false);
 
-        float baseExposure = 0.5f;     // 你目前流程就是用 0.5 當正常亮度
-        float darkExposure = -2.0f;    // 第二段要暗下來用
+        // ✅（重點）鎖對話系統輸入，避免空白鍵亂跳
+        dialogueSystemGame00Script.inputLocked = true; // 開始
 
-        //// 1) 需要暗下來才做（第二段）
-        //if (darkFirst)
-        //    yield return StartCoroutine(fader.FadeExposure(1.0f, baseExposure, darkExposure));
-
-        // 2) 打開 error panel
-        Debug.Log("[Teach] AbnormalCaptureFlow ENTER");
-        openErrorPanel();
-
-        // 等淡入完成
-        var cg = ErrorPanel != null ? ErrorPanel.GetComponent<CanvasGroup>() : null;
-        if (cg != null)
-            yield return new WaitUntil(() => cg.alpha >= 1f);
-
-        // 4) 顯示提示文字（你可以改文案）
-        if (HintText != null)
+        if (currentPhase == GamePhase.Teaching)
         {
-            HintText.gameObject.SetActive(true);
-            HintText.text = showSmile
-                ? "盡快點擊異常！"
-                : "對準異常，按下快門";
-        }
-
-        // 3) 第二段：等 3 秒後 smile 出現
-        if (showSmile && smileTf != null)
-        {
-            smileTf.gameObject.SetActive(false);
-            yield return new WaitForSeconds(waitSmileSeconds);
-            smileTf.gameObject.SetActive(true);
-
-            // 第二段目標就是 smile
-            targetTf = smileTf;
-        }
-
-        // 5) 指引框出現 + 移到指定目標
-        if (PhotoFrameImage != null) PhotoFrameImage.gameObject.SetActive(true);
-
-        //if (PhotoFrameRect != null && targetTf != null)
-        //    yield return StartCoroutine(MoveFrameToTargetAny(PhotoFrameRect, targetTf, photoFrameAutoMoveSpeed));
-
-        // 6) 等玩家點擊拍照框（改成 Button OnClick）
-        photoFrameClicked = false;
-
-        // 拿到 Button
-        var btn = PhotoFrameImage != null ? PhotoFrameImage.GetComponent<Button>() : null;
-
-        // 在「移動期間」先鎖住，避免還沒到位就被點
-        if (btn != null) btn.interactable = false;
-
-        // 只移動一次：移到指定目標
-        if (PhotoFrameRect != null && targetTf != null)
-            yield return StartCoroutine(MoveFrameToTargetAny(PhotoFrameRect, targetTf, photoFrameAutoMoveSpeed));
-
-        // 移完再允許點
-        if (btn != null) btn.interactable = true;
-
-        photoFrameClicked = false;
-        yield return new WaitUntil(() => photoFrameClicked);
-
-        if (btn != null) btn.interactable = false;
+            _teachingRunning = true;
+            _teachingDone = false;
+            dialogueSystemGame00Script.inputLocked = true;  // 教學開始
 
 
+            yield return StartCoroutine(StartTeachingRound());
 
-        // 7) 點框 = 快門 → 閃光
-        if (HintText != null) HintText.text = "影像鎖定…";
+            // ✅（重點）等玩家真的完成教學
+            yield return new WaitUntil(() => _teachingDone);
 
-        float flashExposure = 2.5f;
-        yield return StartCoroutine(fader.FadeExposure(0.1f, baseExposure, flashExposure));
-        yield return StartCoroutine(fader.FadeExposure(0.9f, flashExposure, baseExposure));
+            _teachingRunning = false;
 
-        // 8) 顯示正確面板並等待 3 秒（期間不恢復、不淡出）
-        if (CorrectPhotoPanel != null) CorrectPhotoPanel.SetActive(true);
-        if (HintText != null) HintText.text = "異常影像已成功保存";
+            // ✅ 解鎖對話系統
+            dialogueSystemGame00Script.inputLocked = false; // 教學結束
 
-        yield return new WaitForSeconds(3f);
-
-        // 9) 3 秒後才開始淡出（面板淡出）
-        if (CorrectPhotoPanel != null)
-        {
-            // 如果你 CorrectPhotoPanel 也想淡出，前提：它有 CanvasGroup
-            CanvasGroup correctCg = CorrectPhotoPanel.GetComponent<CanvasGroup>();
-            if (correctCg != null)
-            {
-                // 先確保 alpha 是 1
-                correctCg.alpha = 1f;
-                animationScript.Fade(CorrectPhotoPanel, 0.6f, 1f, 0f, null);
-                yield return new WaitForSeconds(0.6f);
-            }
-            CorrectPhotoPanel.SetActive(false);
-        }
-
-        // Hint 也收掉
-        if (HintText != null) HintText.gameObject.SetActive(false);
-
-        // 拍照框與 smile 收掉
-        if (PhotoFrameImage != null) PhotoFrameImage.gameObject.SetActive(false);
-        if (showSmile && smileTf != null) smileTf.gameObject.SetActive(false);
-
-        // ErrorPanel 淡出（你要「恢復原本狀況」= 這裡才開始）
-        if (ErrorPanel != null)
-        {
-            animationScript.Fade(ErrorPanel, 0.6f, 1f, 0f, null);
-            yield return new WaitForSeconds(0.6f);
-            ErrorPanel.SetActive(false);
-        }
-        if (ErrorPlace != null) ErrorPlace.SetActive(false);
-        if (CirclePlace != null) CirclePlace.SetActive(false);
-
-        // ✅ 教學結束最後：恢復到進教學前
-        RestoreAfterTeaching();
-        PhonePanel.SetActive(false);
-
-        photoFrameClicked = false;
-
-    }
-
-
-    //IEnumerator MoveFrameToTargetUI(RectTransform frame, Transform uiTarget, float speed)
-    //{
-    //    if (frame == null || uiTarget == null) yield break;
-
-    //    RectTransform targetRect = uiTarget as RectTransform;
-    //    if (targetRect == null)
-    //    {
-    //        Debug.LogWarning("[TeachPhotoFlow] PhotoFrameTeachTarget 不是 RectTransform，請放 UI 物件或一個 RectTransform。");
-    //        yield break;
-    //    }
-
-    //    // 目標 anchoredPosition
-    //    Vector2 targetAnchored = targetRect.anchoredPosition;
-
-    //    while (Vector2.Distance(frame.anchoredPosition, targetAnchored) > 5f)
-    //    {
-    //        frame.anchoredPosition = Vector2.MoveTowards(frame.anchoredPosition, targetAnchored, speed * Time.deltaTime);
-    //        yield return null;
-    //    }
-
-    //    frame.anchoredPosition = targetAnchored;
-    //}
-
-    IEnumerator MoveFrameToTargetAny(RectTransform frame, Transform target, float speed)
-    {
-        if (frame == null || target == null || UICanvas == null) yield break;
-
-        // 1) 目標如果是 UI（RectTransform）
-        RectTransform targetRect = target as RectTransform;
-        if (targetRect != null)
-        {
-            Vector2 dest = targetRect.anchoredPosition;
-            while (Vector2.Distance(frame.anchoredPosition, dest) > 5f)
-            {
-                frame.anchoredPosition = Vector2.MoveTowards(frame.anchoredPosition, dest, speed * Time.deltaTime);
-                yield return null;
-            }
-            frame.anchoredPosition = dest;
             yield break;
         }
+    }
 
-        // 2) 目標如果是世界座標：世界 → 螢幕 → Canvas local
-        RectTransform canvasRect = UICanvas.transform as RectTransform;
-        Camera cam = UICanvas.worldCamera != null ? UICanvas.worldCamera : Camera.main;
-
-        while (true)
+    /// <summary>
+    /// 由對話 / 劇情呼叫（teachstart）
+    /// </summary>
+    public void TeachStart()//教學狀態切換
+    {
+        currentPhase = GamePhase.Teaching;
+    }
+    // 入口1：點到 spot
+    public void OnSpotClicked()
+    {
+        if (currentPhase == GamePhase.Teaching)
         {
-
-            Vector3 screen = cam != null ? cam.WorldToScreenPoint(target.position) : Camera.main.WorldToScreenPoint(target.position);
-
-            Vector2 localPoint;
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screen, UICanvas.worldCamera, out localPoint);
-
-            if (Vector2.Distance(frame.anchoredPosition, localPoint) <= 5f)
-            {
-                frame.anchoredPosition = localPoint;
-                break;
-            }
-
-            frame.anchoredPosition = Vector2.MoveTowards(frame.anchoredPosition, localPoint, speed * Time.deltaTime);
-            Debug.Log($"[MoveFrameToTargetAny] dist={Vector2.Distance(frame.anchoredPosition, localPoint)} localPoint={localPoint}");
-
-            yield return null;
+            StartCoroutine( HandleSuccess());
+            return;
         }
+
+        if (currentPhase == GamePhase.Playing)
+        {
+            spotManager.OnPlaySpotClick();
+            return;
+        }
+
+    }
+    // =====================================================
+    // 🎓 教學流程
+    // =====================================================
+
+    private IEnumerator StartTeachingRound()//開始教學回合
+    {
+        Debug.Log("[First] Teaching round start");
+        yield return null;
+
+        DisablePhotoFrameFollow();
+        yield return new WaitUntil(() => ErrorPanel.GetComponent<CanvasGroup>().alpha == 1);
+        ShowTeachHint();
+        yield return new WaitForSeconds(1);
+        MovePhotoFrameToTeachTarget();
+
+
+        // ❌ 教學不開 timer、不記分
+    }
+    private Coroutine teachRoutine;
+
+    public void Act_RequestTeach1()
+    {
+        currentPhase = GamePhase.Teaching;   // ✅ 教學正式啟動
+        _teachingRunning = true;
+        _teachingDone = false;
+        inTeach01 = true;
+        if (teachRoutine != null) return;
+        teachRoutine = StartCoroutine(Teach1Routine()); // ← 你自己的教學流程
+    }
+
+    public void Act_RequestTeach2()
+    {
+        currentPhase = GamePhase.Teaching;   // ✅ 教學正式啟動
+        _teachingRunning = true;
+        _teachingDone = false;
+        if (teachRoutine != null) return;
+        teachRoutine = StartCoroutine(Teach2Routine());
+    }
+
+    private IEnumerator Teach1Routine()
+    {
+        // TODO: 教學1內容
+        PhotoFrameTeachTarget = PhotoFrameTeachTarget01;
+        yield return null;
+        teachRoutine = null;
+    }
+
+    private IEnumerator Teach2Routine()
+    {
+        // TODO: 教學2內容
+        PhotoFrameTeachTarget = PhotoFrameTeachTarget02;
+
+        PhotoFrameTeachTarget01.gameObject.SetActive(false);
+        PhotoFrameTeachTarget02.gameObject.SetActive(true);
+        yield return null;
+        teachRoutine = null;
+    }
+    private void EndTeaching()
+    {
+        PhotoFrameTeachTarget01.gameObject.SetActive(false);
+        PhotoFrameTeachTarget02.gameObject.SetActive(false);
+
+        //EnablePhotoFrameFollow();
+        //HideTeachHint();
+
+        currentPhase = GamePhase.Playing;
     }
 
 
-    void FollowPointer(RectTransform frame)
+    // =====================================================
+    // 🎮 正式遊戲流程
+    // =====================================================
+
+    private IEnumerator StartNormalRound()//開始正式遊戲
+    {
+        Debug.Log("[First] Normal round start");
+
+        currentPhase = GamePhase.Playing;
+
+        EnablePhotoFrameFollow();
+        HideTeachHint();
+
+        countText.gameObject.SetActive(true);
+        // 開回合
+        spotManager.BeginRound();
+
+        // Timer 超時 = 當成失誤
+        timer.onTimeUp = () =>
+        {
+            Debug.Log("[First] Timeout");
+            spotManager.OnTimeout();
+        };
+
+        timer.StartCountdown(roundSeconds);
+        yield return null;
+    }
+
+    // =====================================================
+    // 📡 SpotManager 事件回調
+    // =====================================================
+
+    private void HandleRoundEnded(int roundIndex, int totalFound, RoundEndType endType)//計算當前回合數
+    {
+        Debug.Log($"[First] Round {roundIndex} end: {endType}");
+
+        // 停 timer
+        if (timer != null)
+            timer.onTimeUp = null;
+
+        // 記錄回合結果（讓 Act_GameStart 知道回合已經結束）
+        _roundFinished = true;
+        _lastEndType = endType;
+
+        // 跑回合結束演出，演出跑完才真正「放行」
+        StartCoroutine(RoundEndFlow_AndMarkDone(endType));
+    }
+
+    private IEnumerator RoundEndFlow_AndMarkDone(RoundEndType endType)
+    {
+        _roundFlowDone = false;
+
+        yield return StartCoroutine(RoundEndFlow(endType));
+
+        _roundFlowDone = true;
+    }
+
+    private IEnumerator RoundEndFlow(RoundEndType endType)//回合結束的流程
+    {
+        // 1️⃣ 播成功 / 失敗演出
+        if (endType == RoundEndType.FoundSpot)
+        {
+            yield return StartCoroutine(HandleSuccess());
+        }
+        else
+        {
+            yield return StartCoroutine(HandleFailure());
+        }
+
+        // 2️⃣ 回合 UI 清乾淨（畫面回到正常狀態）
+        CleanupRoundUI();
+
+        // 3️⃣ 等一幀，確保畫面穩定
+        yield return null;
+
+        // 4️⃣ 現在才判斷最終結局
+        CheckFinalResultOrContinue();
+    }
+
+    private void CheckFinalResultOrContinue()//判斷是通關還是失敗
+    {
+        if (spotManager.IsWin())
+        {
+            Debug.Log("[First] GAME WIN");
+            currentPhase = GamePhase.End;
+
+            StartCoroutine(GoToWinScene());
+            return;
+        }
+
+        if (spotManager.IsGameEnded())
+        {
+            Debug.Log("[First] GAME OVER");
+            currentPhase = GamePhase.End;
+
+            StartCoroutine(GoToLoseScene());
+            return;
+        }
+
+        // 還沒結束 → 等劇情再呼叫下一次 GameStart
+        Debug.Log("[First] Round finished, wait for story");
+    }
+
+    private IEnumerator GoToWinScene()
+    {
+        // 可選：淡出、關燈、音效
+        yield return new WaitForSeconds(0.5f);
+
+        animationScript.Fade(
+            BlackPanel,
+            1f,
+            0f,
+            1f,
+            () => sceneChangeScript.SceneC("success")
+        );
+    }
+
+    private IEnumerator GoToLoseScene()
+    {
+        yield return new WaitForSeconds(0.5f);
+
+        animationScript.Fade(
+            BlackPanel,
+            1f,
+            0f,
+            1f,
+            () => sceneChangeScript.SceneC("fail")
+        );
+    }
+    private void TotalFoundChangedUI(int totalFound)//更新UI
+    {
+        if (countText == null || spotManager == null) return;
+
+        
+        countText.text = $"{totalFound} / {spotManager.totalRounds}";
+    }
+
+
+    // =====================================================
+    // 🎉 成功 / 失敗演出
+    // =====================================================
+
+    private IEnumerator HandleSuccess()//點到正確位置
+    {
+        Debug.Log("[First] Success feedback");
+
+        // TODO：成功閃光 / 正確提示
+        // 先暫停回合（避免玩家連點）
+        spotManager.PauseRound();
+
+        // 顯示「異常捕捉...」
+        HintText.gameObject.SetActive(true);
+        HintText.text = "異常捕捉中...";
+
+        // 閃一下
+        yield return StartCoroutine(fader.FlashByExposure(10f, 0.01f, 0.08f));
+
+        // 等一下做出「正在處理」的感覺
+        yield return new WaitForSeconds(1.6f);
+
+        // 顯示「成功!」
+        if (HintText != null)
+            HintText.text = "異常捕捉成功!";
+        if (inTeach01)
+        {
+            StartCoroutine(Act_ShowPhoto(Picture01));
+            yield return new WaitForSeconds(1);
+        }
+
+        //更新數量
+        TotalFoundChangedUI(spotManager.totalFound);
+
+        
+        yield return new WaitForSeconds(1f);
+        animationScript.Fade(ErrorPanel, 2, 1, 0, null);
+
+        dialogueSystemGame00Script.inputLocked = false; // 教學結束
+        yield return new WaitForSeconds(3f);
+        CleanupRoundUI();
+        PicturePanel.gameObject.SetActive(false);
+        // ✅如果是在教學，就在這裡結束教學並放行劇情
+        if (currentPhase == GamePhase.Teaching)
+        {
+            EndTeaching();          // 你已經有寫：切換到 Playing、開跟隨、關提示
+            _teachingDone = true;   // ✅放行 Act_GameStart
+        }
+    }
+
+    private IEnumerator HandleFailure()//點錯位置
+    {
+        Debug.Log("[First] Failure feedback");
+
+        if (RedPanel != null)
+        {
+            RedPanel.SetActive(true);
+            yield return new WaitForSeconds(1f);
+            RedPanel.SetActive(false);
+        }
+
+        //CleanupRoundUI();
+    }
+
+    // =====================================================
+    // 🧹 UI 清理
+    // =====================================================
+
+    private void CleanupUI()//關掉所有UI
+    {
+        if (ErrorPanel != null) ErrorPanel.SetActive(false);
+        if (RedPanel != null) RedPanel.SetActive(false);
+        if (PhotoFrameImage != null) PhotoFrameImage.SetActive(false);
+        if (HintText != null) HintText.gameObject.SetActive(false);
+        if (BlackPanel != null) BlackPanel.SetActive(false);
+        if (BlackPanel22 != null) BlackPanel22.SetActive(false);
+        if (ErrorPanel != null) ErrorPanel.SetActive(false);
+        if (RedPanel != null) RedPanel.SetActive(false);
+        if (PhotoFrameImage != null) PhotoFrameImage.SetActive(false);
+        if (HintText != null) HintText.gameObject.SetActive(false);
+        if (PicturePanel != null) PicturePanel.SetActive(false);
+        if (GameName != null) GameName.SetActive(false);
+        if (Timetext != null) Timetext.SetActive(false);
+    }
+
+    private void CleanupRoundUI()//關掉遊戲會用到的UI
+    {
+        if (ErrorPanel != null) ErrorPanel.SetActive(false);
+        if (RedPanel != null) RedPanel.SetActive(false);
+        if (PhotoFrameImage != null) PhotoFrameImage.SetActive(false);
+        if (HintText != null) HintText.gameObject.SetActive(false);
+        countText.gameObject.SetActive(false);
+    }
+
+    // =====================================================
+    // 📷 拍照框控制（你專案原本就有的概念）
+    // =====================================================
+
+    private void EnablePhotoFrameFollow()//拍照框跟隨滑鼠
+    {
+        if (PhotoFrameImage != null)
+            PhotoFrameImage.SetActive(true);
+
+        photoFrameFollowEnabled = true;
+
+        // ⚠️ 如果教學自動移動還在跑，先停掉
+        if (photoFrameMoveRoutine != null)
+        {
+            StopCoroutine(photoFrameMoveRoutine);
+            photoFrameMoveRoutine = null;
+        }
+        // TODO：如果你是用 Update 跟隨滑鼠，這裡只要開旗標
+    }
+
+    private void DisablePhotoFrameFollow()//拍照框不能跟隨滑鼠
+    {
+        photoFrameFollowEnabled = false;
+
+        // ❗ 不要 SetActive(false)
+        // 教學流程還會用到同一個框
+        // TODO：關閉滑鼠跟隨（不要 Destroy）
+    }
+
+    private void MovePhotoFrameToTeachTarget()//拍照框自動移動
+    {
+        if (PhotoFrameRect == null || PhotoFrameTeachTarget == null || UICanvas == null)
+            return;
+
+        // 教學時一定關掉滑鼠跟隨
+        photoFrameFollowEnabled = false;
+
+        // 停掉可能殘留的移動
+        if (photoFrameMoveRoutine != null)
+            StopCoroutine(photoFrameMoveRoutine);
+
+        PhotoFrameTeachTarget.gameObject.SetActive(true);
+        photoFrameMoveRoutine = StartCoroutine(
+            MoveFrameToTarget(PhotoFrameRect, PhotoFrameTeachTarget, photoFrameAutoMoveSpeed)
+        );
+
+        // TODO：把拍照框移到教學指定 UI 位置
+    }
+
+    private void FollowPointer(RectTransform frame)//拍照框跟隨滑鼠
     {
         if (frame == null || UICanvas == null) return;
 
         Vector2 screenPos = Input.mousePosition;
-        if (Input.touchCount > 0) screenPos = Input.GetTouch(0).position;
+        if (Input.touchCount > 0)
+            screenPos = Input.GetTouch(0).position;
 
         RectTransform canvasRect = UICanvas.transform as RectTransform;
         Vector2 localPoint;
-        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPos, UICanvas.worldCamera, out localPoint))
+
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            canvasRect,
+            screenPos,
+            UICanvas.worldCamera,
+            out localPoint
+        ))
         {
-            frame.anchoredPosition = Vector2.Lerp(frame.anchoredPosition, localPoint, photoFrameFollowSpeed * Time.deltaTime);
+            frame.anchoredPosition = Vector2.Lerp(
+                frame.anchoredPosition,
+                localPoint,
+                photoFrameFollowSpeed * Time.deltaTime
+            );
         }
     }
 
-    bool PointerDownThisFrame()
+    private IEnumerator MoveFrameToTarget(RectTransform frame, Transform target, float speed)//拍照框自動移動細節
     {
-        if (Input.touchCount > 0) return Input.GetTouch(0).phase == TouchPhase.Began;
-        return Input.GetMouseButtonDown(0);
-    }
-
-    bool IsPointerOverUI(GameObject target)
-    {
-        if (target == null || uiRaycaster == null || eventSystem == null) return false;
-
-        Vector2 screenPos = Input.mousePosition;
-        if (Input.touchCount > 0) screenPos = Input.GetTouch(0).position;
-
-        var ped = new PointerEventData(eventSystem) { position = screenPos };
-        var results = new List<RaycastResult>();
-        uiRaycaster.Raycast(ped, results);
-
-        for (int i = 0; i < results.Count; i++)
+        while (Vector3.Distance(frame.position, target.position) > 0.5f)
         {
-            if (results[i].gameObject == target) return true;
-            // 如果 target 底下還有子物件（例如框有裝飾），也算點到
-            if (results[i].gameObject.transform.IsChildOf(target.transform)) return true;
-        }
-        return false;
-    }
-
-    void CleanupPhotoTeachUI()
-    {
-        if (CorrectPhotoPanel != null) CorrectPhotoPanel.SetActive(false);
-        if (WrongPhotoPanel != null) WrongPhotoPanel.SetActive(false);
-
-        if (PhotoFrameImage != null) PhotoFrameImage.gameObject.SetActive(false);
-
-        if (HintText != null) HintText.gameObject.SetActive(false);
-
-        // Error UI 都收起
-        if (CirclePlace != null) CirclePlace.SetActive(false);
-        if (ErrorPlace != null) ErrorPlace.SetActive(false);
-
-        if (ErrorPanel != null)
-        {
-            // 你要淡出也行，我這邊直接關
-            ErrorPanel.SetActive(false);
-        }
-    }
-
-
-    IEnumerator SceneFlow()
-    {
-        
-
-        // 4) 對話
-        if (!dialogueSystemGame00Script.skipRequested)
-        {
-            dialogueSystemGame00Script.StartDialogue(dialogueSystemGame00Script.TextfileGame00);
-            yield return new WaitUntil(() => dialogueSystemGame00Script.FirstDiaFinished);
-        }
-        else
-        {
-            // 跳過後：把對話系統收掉，並避免 WaitUntil 卡住
-            if (dialogueSystemGame00Script != null)
-            {
-                dialogueSystemGame00Script.StopTyping();
-                dialogueSystemGame00Script.isTyping = false;
-                dialogueSystemGame00Script.SetPanels(false, false);
-                dialogueSystemGame00Script.FirstDiaFinished = true;
-            }
-        }
-        //ApplyCheckpointState(SceneCheckpoint.AfterDialogue);
-
-        // ---- 到這裡：劇情段結束，切到教學段（先不給跳） ----
-        //stage = FlowStage.Teaching;
-
-        //Player.SetActive(false);
-        //BlackPanel.SetActive(false);
-        //cControllScript.playerControlEnabled = false;
-        //PhonePanel.SetActive(false);
-        //// 5) Teach1
-        //// 教學前「標準狀態」統一一下，確保跳過跟乖乖看完一樣
-        //ApplyBeforeTeachingState();
-
-        //// Teach 1
-        //teachRoutine = StartCoroutine(AbnormalTeach_1());
-        //yield return teachRoutine;
-        //teachRoutine = null;
-        //ApplyCheckpointState(SceneCheckpoint.AfterTeach1);
-
-        //Debug.Log("中間劇情");
-
-        //// Teach 2
-        //teachRoutine = StartCoroutine(AbnormalTeach_2());
-        //yield return teachRoutine;
-        //teachRoutine = null;
-        //ApplyCheckpointState(SceneCheckpoint.AfterTeach2);
-
-
-        ////2.1紅光亮起
-        //redLight();
-        //yield return new WaitUntil(() => ErrorLight.color.a==1f);
-
-        //////2.1對話
-        ////DSG00.StartDialogue(DSG00.TextfileLookPhone);
-        ////yield return new WaitForSeconds(1f);
-
-        ////2.2看手機
-        //cControllScript.animator.SetBool("phone", true);
-        //yield return StartCoroutine(WaitForAnimation(cControllScript.animator, "phone"));
-        ////yield return new WaitForSeconds(0.5f);
-        //hasPressedCamera = false;
-        //// ⏳ 在這裡乖乖等玩家按
-        //yield return new WaitUntil(() => hasPressedCamera);
-
-        //// 玩家已經按了相機，可以收手機 UI、結束手機動畫
-        //PhonePanel.SetActive(false);
-        //cControllScript.animator.SetBool("phone", false);
-
-        ////3.errorpanel亮起
-        //// 🔥 紅光閃完 → 顯示異常提示 Panel
-        //Player.SetActive(false);
-        //openErrorPanel();
-
-        ////4.等error面板出現再開始倒數計時
-        //yield return new WaitUntil(() => ErrorPanel.GetComponent<CanvasGroup>().alpha == 1);
-
-        ////5.開始倒數計時
-        //timer.StartCountdown(15);
-
-        ////6.開始找錯
-        //ErrorStart = true;
-        //errorResultHandled = false;
-    }
-
-    private void ApplyBeforeTeachingState()
-    {
-        // 你原本在 SceneFlow 進教學前做的那些狀態統一在這裡
-        if (BlackPanel != null) BlackPanel.SetActive(false);
-        if (PhonePanel != null) PhonePanel.SetActive(false);
-
-        // 你的教學流程本來就是先把玩家藏起來並鎖控制
-        //if (Player != null) Player.SetActive(false);
-        if (cControllScript != null) cControllScript.playerControlEnabled = false;
-
-        // 教學 UI 預設收乾淨（避免跳過殘留）
-        if (HintText != null) HintText.gameObject.SetActive(false);
-        if (PhotoFrameImage != null) PhotoFrameImage.gameObject.SetActive(false);
-        if (CorrectPhotoPanel != null) CorrectPhotoPanel.SetActive(false);
-        if (WrongPhotoPanel != null) WrongPhotoPanel.SetActive(false);
-        if (smileTf != null) smileTf.gameObject.SetActive(false);
-
-        // Error 面板類
-        if (ErrorPanel != null) ErrorPanel.SetActive(false);
-        if (ErrorPlace != null) ErrorPlace.SetActive(false);
-        if (CirclePlace != null) CirclePlace.SetActive(false);
-
-        // 光線/曝光對齊到你「劇情完畢」常態
-        if (fader != null) fader.SetExposureImmediate(0.5f);
-        if (ErrorLight != null)
-        {
-            var c = ErrorLight.color;
-            c.a = 0f;
-            ErrorLight.color = c;
-        }
-
-        // 鏡頭保險到位（防跳過）
-        //if (cameraMoveControllScript != null && cameraMoveControllScript.cam != null && TargetPoint != null)
-        //    cameraMoveControllScript.cam.transform.position = TargetPoint.position;
-
-        // 劇情跳過後不要再影響後面
-        dialogueSystemGame00Script.skipRequested = false;
-    }
-
-
-    //第一段：你給一個異常目標 Transform（你說你會自己拉）
-    public IEnumerator AbnormalTeach_1()
-    {
-        // 不暗、不顯示 smile、不等待
-        yield return StartCoroutine(AbnormalCaptureFlow(PhotoFrameTeachTarget, darkFirst: false, showSmile: false, waitSmileSeconds: 0f));
-    }
-
-    //第二段：固定是 smile（暗下來 → 開面板 → 等 3 秒 smile 出現 → 移到 smile）
-    public IEnumerator AbnormalTeach_2()
-    {
-        yield return StartCoroutine(AbnormalCaptureFlow(null, darkFirst: true, showSmile: true, waitSmileSeconds: 3f));
-    }
-
-
-    // Update is called once per frame
-    void Update()
-    {
-        //如果被請求，且目前沒有教學在跑，就開教學
-        if (requestTeach1)
-        {
-            requestTeach1 = false;
-            StartTeach(AbnormalTeach_1());
-        }
-        else if (requestTeach2)
-        {
-            requestTeach2 = false;
-            StartTeach(AbnormalTeach_2());
-        }
-        if (dialogueSystemGame00Script != null && dialogueSystemGame00Script.jumpRequested)
-        {
-            dialogueSystemGame00Script.jumpRequested = false;
-
-            // 依 jumpTarget 對齊狀態
-            ApplyCheckpointState(dialogueSystemGame00Script.jumpTarget);
-
-            // 同步 stage（你自己定義哪些 checkpoint 算 cutscene / teaching）
-            stage = (dialogueSystemGame00Script.jumpTarget <= SceneCheckpoint.AfterDialogue)
-                ? FlowStage.Cutscene
-                : FlowStage.Teaching;
-
-            // 也把對話停掉，避免殘影
-            dialogueSystemGame00Script.StopTyping();
-            dialogueSystemGame00Script.SetPanels(false, false);
-        }
-        // 跳過劇情（你也可以改成 UI Button 來呼叫 SkipToTeaching()）
-        if (Input.GetKeyDown(KeyCode.Escape))
-        {
-            // 教學段：先不給跳（最穩）
-            if (teachRoutine != null) return;
-
-            // 劇情段：ESC = 跳到下一個 MUST label，沒有就直接結束對話
-            if (stage == FlowStage.Cutscene && dialogueSystemGame00Script != null)
-            {
-                dialogueSystemGame00Script.SkipByEsc_ToNextMustOrEnd();
-                return;
-            }
-
-            // 如果你之後真的要「教學段也能跳」，再在這裡加規則
-        }
-
-
-        timer.timerText.gameObject.SetActive(ErrorPanel.activeSelf);
-        if (spotManager == null) return;
-
-        if (!ErrorStart || errorResultHandled) return;
-        // 🔎 檢查目前找到幾個異常
-
-        //1. 成功條件：找到全部，且時間還沒負數
-        if (ErrorStart && spotManager.foundCount >= spotManager.totalCount && timer.currentTime >= 0f)
-        {
-            errorResultHandled = true;
-            ErrorStart = false;   // 關閉這一輪檢查
-            timer.ForceEnd();
-            StartCoroutine(OnErrorComplete()); // 通關
-        }
-        else if(ErrorStart && timer.currentTime <= 0f && spotManager.foundCount < spotManager.totalCount)//2. 失敗條件：時間 < 0 且還沒找完
-        {
-            //遊戲失敗
-            errorResultHandled = true;
-            ErrorStart = false;
-            timer.ForceEnd();
-            StartCoroutine(ErrorMistake());   // 失敗
-        }
-       
-    }
-
-    private void StartTeach(IEnumerator teachFlow)
-    {
-        if (teachRoutine != null) StopCoroutine(teachRoutine);
-        teachRoutine = StartCoroutine(TeachWrapper(teachFlow));
-    }
-
-    private IEnumerator TeachWrapper(IEnumerator teachFlow)
-    {
-        yield return StartCoroutine(teachFlow);
-        teachRoutine = null;
-    }
-
-    public void SkipToTeaching()
-    {
-        if (dialogueSystemGame00Script.skipRequested) return;
-        dialogueSystemGame00Script.skipRequested = true;
-
-        // 你想跳到哪？你目前需求是：「Teach1結束後還要繼續印中間劇情、跑Teach2」
-        dialogueSystemGame00Script.skipToCP = SceneCheckpoint.AfterTeach1;
-
-        // 強制把畫面對齊到「AfterTeach1」的標準狀態
-        ApplyCheckpointState(dialogueSystemGame00Script.skipToCP);
-
-        // 不要 StopAllCoroutines()
-        // 不要 StopCoroutine(sceneFlowRoutine)
-    }
-
-
-    private void EnterTeachingStateOnly()
-    {
-        if (BlackPanel != null) BlackPanel.SetActive(false);
-        if (PhonePanel != null) PhonePanel.SetActive(false);
-
-        if (CorrectPhotoPanel != null) CorrectPhotoPanel.SetActive(false);
-        if (WrongPhotoPanel != null) WrongPhotoPanel.SetActive(false);
-        if (HintText != null) HintText.gameObject.SetActive(false);
-        if (PhotoFrameImage != null) PhotoFrameImage.gameObject.SetActive(false);
-        if (smileTf != null) smileTf.gameObject.SetActive(false);
-
-        if (Player != null) Player.SetActive(false);
-        if (cControllScript != null) cControllScript.playerControlEnabled = false;
-
-        if (fader != null) StartCoroutine(fader.FadeExposure(0.1f, -10f, 0.5f));
-        if (ErrorLight != null) StartCoroutine(AbnormalLight(0.2f, ErrorLight.color.a, 0f));
-
-        // 鏡頭強制到位
-        //if (cameraMoveControllScript != null && cameraMoveControllScript.cam != null && TargetPoint != null)
-        //    cameraMoveControllScript.cam.transform.position = TargetPoint.position;
-
-        if (ErrorPanel != null) ErrorPanel.SetActive(false);
-        if (ErrorPlace != null) ErrorPlace.SetActive(false);
-        if (CirclePlace != null) CirclePlace.SetActive(false);
-    }
-
-
-    public IEnumerator AbnormalLight(float duration,float start, float end)//讓窗外異常光線啟動（瞬間變紅、變亮）
-    {
-        float timer = 0f;
-        Color c = ErrorLight.color;
-        c.a = start;
-        ErrorLight.color = c;
-
-        // 淡入
-        while (timer < duration)
-        {
-            timer += Time.deltaTime;
-            float t = timer / duration;
-            c.a = Mathf.Lerp(start, end, t);
-            ErrorLight.color = c;
-
+            frame.position = Vector3.MoveTowards(frame.position, target.position, speed * Time.deltaTime);
             yield return null;
         }
-
-        c.a = end;
-        ErrorLight.color = c;
+        frame.position = target.position;
     }
 
-    void redLight()
+    public IEnumerator WaitForClipEnd(Animator animator, string stateName, int layer = 0)//等動畫撥完
     {
-        // 開始紅光閃爍（等你之後實作 abnormal() 和 RecoverNormalLight()）
-        warningCoroutine = StartCoroutine(WindowWarningLoop());
-    }
+        if (animator == null) yield break;
 
-    //教學完成：停止紅光、恢復正常光線、之後可接下一段劇情
-    IEnumerator OnErrorComplete()
-    {
-        yield return new WaitForSeconds(3f);
-        Debug.Log("[First] 教學完成：找到足夠異常，恢復正常光線");
-
-        // 停止紅光閃爍
-        if (warningCoroutine != null)
+        // 等到 clip 出現
+        while (true)
         {
-            //StopCoroutine(warningCoroutine);
-            warningCoroutine = null;
-
-            
-            if (ErrorPlace != null)
-                ErrorPlace.SetActive(false); // 關閉異常提示界面
-            spotManager.ClearAllCircles();
-            ErrorStart = false;
-            CirclePlace.SetActive(false);
-            animationScript.Fade(ErrorPanel,2f,1f,0f,null);
-            yield return new WaitForSeconds(2f);
-            ErrorPanel.SetActive(false);
-            Player.SetActive(true);
-
-            // 恢復正常光線
-            yield return new WaitForSeconds(0.5f);
-            StartCoroutine(AbnormalLight(2f,1f,0f));
-            yield return new WaitForSeconds(0.5f);
-
-            // 可選：恢復玩家控制／進入下一段劇情
-            if (cControllScript != null)
-            {
-                cControllScript.playerControlEnabled = true;
-            }
-        }
-    }
-
-    //紅光閃爍的循環（之後你可以在裡面呼叫 2D Light 或改 shader 顏色）
-    IEnumerator WindowWarningLoop()
-    {
-        Debug.Log("[First] 紅光閃爍啟動");
-        yield return new WaitForSeconds(0.5f);
-        StartCoroutine(AbnormalLight(2f, 0f, 1f));
-        //while (!teachFinished)
-        //{
-        //    // TODO：讓窗外變紅、閃爍一次
-        //    AbnormalLightOn();
-
-        //    yield return new WaitForSeconds(0.3f);
-
-        //    // TODO：紅光變暗 / 關閉
-        //    AbnormalLightOff();
-        Debug.Log("開始變紅");
-        yield return new WaitForSeconds(2.5f);
-        //}
-    }
-
-    public IEnumerator WaitForAnimation(Animator animator, string stateName)
-    {
-        // 等到進入該動畫 state
-        while (!animator.GetCurrentAnimatorStateInfo(0).IsName(stateName))
-            yield return null;
-
-        // 動畫還在播
-        while (animator.GetCurrentAnimatorStateInfo(0).normalizedTime < 1f)
-            yield return null;
-    }
-
-    public void openErrorPanel()
-    {
-        Debug.Log("[First] 顯示異常提示畫面 ErrorPlace");
-        ErrorPlace.SetActive(true);
-        ErrorPanel.SetActive(true);
-        animationScript.Fade(ErrorPanel, 2f, 0f, 1f, null);
-        CirclePlace.SetActive(true);
-        spotManager.RefreshActiveSpots();
-    }
-
-    public void OnCameraButtonClicked()
-    {
-        Debug.Log("[First] 玩家按下手機裡的相機按鈕");
-        hasPressedCamera = true;
-    }
-
-    public IEnumerator ErrorMistake()//遊戲失敗一次
-    {
-        Mistake += 1;
-        RedPanel.SetActive(true);
-        yield return new WaitForSeconds(0.1f);
-        RedPanel.SetActive(false);
-        yield return new WaitForSeconds(0.1f);
-        RedPanel.SetActive(true);
-        yield return new WaitForSeconds(0.1f);
-        RedPanel.SetActive(false);
-        yield return new WaitForSeconds(1.5f);
-        ErrorPanel.SetActive(false);
-        Player.SetActive(true);
-        cControllScript.animator.SetBool("die", true);
-    }
-
-    public void OnPhotoFrameClicked()
-    {
-        Debug.Log("[First] 玩家點擊拍照指引框");
-        photoFrameClicked = true;
-    }
-
-    // 燈光閃爍一次（你可自己調節節奏）
-    public IEnumerator LightFlickerOnce()
-    {
-        BusUpLightTotal.SetActive(false);
-        yield return new WaitForSeconds(0.05f);
-        BusUpLightTotal.SetActive(true);
-        yield return new WaitForSeconds(0.05f);
-        BusUpLightTotal.SetActive(false);
-        yield return new WaitForSeconds(0.05f);
-        BusUpLightTotal.SetActive(true);
-        yield return new WaitForSeconds(0.05f);
-        BusUpLightTotal.SetActive(false);
-        yield return new WaitForSeconds(0.5f);
-        BusUpLightTotal.SetActive(true);
-        yield return new WaitForSeconds(0.5f);
-    }
-
-    public IEnumerator Act_LeftRight()
-    {
-        if (cControllScript == null) yield break;
-
-        // 只抓一個 Renderer，避免改錯人
-        SpriteRenderer sr = cControllScript.spriteRenderer;
-        Animator anim = cControllScript.animator;
-
-        if (sr == null) yield break;
-
-        // ✅ 1. 關 Animator（關鍵）
-        if (anim != null) anim.enabled = false;
-
-        // ✅ 2. 切到 leftidle
-        sr.sprite = cControllScript.leftidle;
-
-        sr.flipX = false;
-        yield return new WaitForSeconds(1f);
-        Debug.Log(1);
-
-        sr.flipX = true;
-        yield return new WaitForSeconds(1f);
-        Debug.Log(1);
-
-        sr.flipX = false;
-        yield return new WaitForSeconds(1f);
-        Debug.Log(1);
-
-        sr.flipX = true;
-        yield return new WaitForSeconds(1f);
-        Debug.Log(1);
-
-        // ✅ 3. 切回 idle
-        sr.flipX = false;
-        sr.sprite = cControllScript.idle;
-
-        yield return new WaitForSeconds(0.2f);
-
-        // ✅ 4. 開回 Animator
-        if (anim != null) anim.enabled = true;
-        yield return new WaitForSeconds(1.5f);
-    }
-
-
-    // 顯示照片（你可以自己接 UI Image / Panel）
-    // 顯示照片：n=1 就顯示 pictures[0]（也就是 01）
-    public void ShowPhotoByNumber(int n)
-    {
-        if (pictures == null || pictures.Length == 0)
-        {
-            Debug.LogWarning("[First] pictures 尚未設定（Inspector 沒拖）");
-            return;
-        }
-
-        int idx = n - 1;
-        if (idx < 0 || idx >= pictures.Length)
-        {
-            Debug.LogWarning($"[First] 找不到照片編號 {n:D2}（pictures 長度={pictures.Length}）");
-            return;
-        }
-
-        // 先全部關掉（確保只顯示一張）
-        for (int i = 0; i < pictures.Length; i++)
-        {
-            if (pictures[i] != null) pictures[i].gameObject.SetActive(false);
-        }
-
-        // 開 panel（如果你有）
-        if (PhotoPanel != null) PhotoPanel.SetActive(true);
-
-        // 開指定那張
-        if (pictures[idx] != null)
-        {
-            pictures[idx].gameObject.SetActive(true);
-            Debug.Log($"[First] ShowPhoto -> {n:D2}");
-        }
-        else
-        {
-            Debug.LogWarning($"[First] pictures[{idx}] 是空的，請確認 Inspector");
-        }
-    }
-
-    // 讓劇本 action 呼叫：支援 "01"、"1"、"ShowPhoto_01"、"ShowPhoto01"、"S02_Photo_01a" 都盡量抓出編號
-    public void ShowPhoto(string photoKey)
-    {
-        if (string.IsNullOrEmpty(photoKey))
-        {
-            Debug.LogWarning("[First] ShowPhoto photoKey 為空");
-            return;
-        }
-
-        // 1) 從字串抓出最後一段連續數字（例如 01、02、12）
-        // 例："ShowPhoto_S02_Photo_01a" -> 01
-        int number = ExtractLastNumber(photoKey);
-
-        if (number <= 0)
-        {
-            Debug.LogWarning($"[First] ShowPhoto 無法解析編號：{photoKey}");
-            return;
-        }
-
-        ShowPhotoByNumber(number);
-    }
-
-    // 抓字串最後一段連續數字
-    private int ExtractLastNumber(string s)
-    {
-        int end = -1;
-        for (int i = s.Length - 1; i >= 0; i--)
-        {
-            if (char.IsDigit(s[i]))
-            {
-                end = i;
+            var clips = animator.GetCurrentAnimatorClipInfo(layer);
+            if (clips.Length > 0 && clips[0].clip != null && clips[0].clip.name == stateName)
                 break;
-            }
-        }
-        if (end == -1) return -1;
-
-        int start = end;
-        while (start - 1 >= 0 && char.IsDigit(s[start - 1]))
-            start--;
-
-        string numStr = s.Substring(start, end - start + 1);
-
-        if (int.TryParse(numStr, out int result))
-            return result;
-
-        return -1;
-    }
-
-    // 可選：關掉照片（用在 ReturnToBus 或照片停留結束時）
-    public void HidePhotoPanel()
-    {
-        if (pictures != null)
-        {
-            for (int i = 0; i < pictures.Length; i++)
-            {
-                if (pictures[i] != null) pictures[i].gameObject.SetActive(false);
-            }
-        }
-        if (PhotoPanel != null) PhotoPanel.SetActive(false);
-    }
-
-
-    // bigpicture：放大照片 target 區塊（你可做成 UI Zoom、或開一個放大 Panel）
-    public IEnumerator BigPictureZoom()
-    {
-        Debug.Log("[First] BigPictureZoom");
-        Camera cam = cameraMoveControllScript.cam;
-        if (cam == null || bigPictureTarget == null)
-            yield break;
-
-        // 1️⃣ 記住原本狀態
-        Vector3 camStartPos = cam.transform.position;
-
-        // 計算「往 target 方向前進」
-        Vector3 dir = (bigPictureTarget.position - camStartPos).normalized;
-        Vector3 camZoomPos = camStartPos + dir * zoomDistance;
-
-        float t = 0f;
-
-        // 2️⃣ 推進（Zoom In）
-        while (t < zoomDuration)
-        {
-            t += Time.deltaTime;
-            float lerp = t / zoomDuration;
-            cam.transform.position = Vector3.Lerp(camStartPos, camZoomPos, lerp);
             yield return null;
         }
-        cam.transform.position = camZoomPos;
 
-        // 3️⃣ 停留
-        yield return new WaitForSeconds(zoomHoldTime);
-
-        // 4️⃣ 拉回（Zoom Out）
-        t = 0f;
-        while (t < zoomDuration)
-        {
-            t += Time.deltaTime;
-            float lerp = t / zoomDuration;
-            cam.transform.position = Vector3.Lerp(camZoomPos, camStartPos, lerp);
+        // 等播完（normalizedTime >= 1）
+        while (animator.GetCurrentAnimatorStateInfo(layer).normalizedTime < 1f)
             yield return null;
+    }
+
+    private void ShowTeachHint()//教學顯示提示文字
+    {
+        if (HintText != null)
+        {
+            HintText.text = "盡快點擊異常!";
+            HintText.gameObject.SetActive(true);
         }
-        cam.transform.position = camStartPos;
-
-        // 5️⃣ 關掉照片 UI
-        if (PhotoPanel != null)
-            PhotoPanel.SetActive(false);
-
-        Debug.Log("[First] BigPictureZoom END");
-        yield return new WaitForSeconds(0.8f);
     }
 
-    // 時間跳轉：你如果有時間 UI 文字就改它
-    public void SetTimeText(string timeText)
+    private void HideTeachHint()//教學文字關掉
     {
-        Debug.Log($"[First] TimeJump -> {timeText}");
-        timetext.text = timeText;
-    }
-
-    // 顯示遊戲標題（你可以做一個 TitlePanel）
-    public IEnumerator ShowGameTitle()
-    {
-        Debug.Log("[First] ShowGameTitle");
-        TitlePanel.SetActive(true);
-        animationScript.Fade(TitlePanel, 1.5f, 0f, 1f, null);
-        yield return new WaitForSeconds(2f);
-        TitlePanel.SetActive(false);
-    }
-
-    public IEnumerator RunTeach1()
-    {
-        ApplyBeforeTeachingState();
-        teachRoutine = StartCoroutine(AbnormalTeach_1());
-        yield return teachRoutine;
-        PhonePanel.SetActive(false);
-        teachRoutine = null;
-    }
-
-    public IEnumerator RunTeach2()
-    {
-        ApplyBeforeTeachingState();
-        teachRoutine = StartCoroutine(AbnormalTeach_2());
-        yield return teachRoutine;
-        PhonePanel.SetActive(false);
-        teachRoutine = null;
-    }
-    private void CaptureBeforeTeaching()
-    {
-        _teachSnap = new TeachingSnapshot();
-
-        _teachSnap.playerActive = Player != null && Player.activeSelf;
-        _teachSnap.playerControl = cControllScript != null && cControllScript.playerControlEnabled;
-
-        _teachSnap.phonePanelActive = PhonePanel != null && PhonePanel.activeSelf;
-        _teachSnap.blackPanelActive = BlackPanel != null && BlackPanel.activeSelf;
-
-        _teachSnap.errorPanelActive = ErrorPanel != null && ErrorPanel.activeSelf;
-        _teachSnap.errorPlaceActive = ErrorPlace != null && ErrorPlace.activeSelf;
-        _teachSnap.circlePlaceActive = CirclePlace != null && CirclePlace.activeSelf;
-
-        _teachSnap.hintActive = HintText != null && HintText.gameObject.activeSelf;
-        _teachSnap.photoFrameActive = PhotoFrameImage != null && PhotoFrameImage.gameObject.activeSelf;
-        _teachSnap.correctPanelActive = CorrectPhotoPanel != null && CorrectPhotoPanel.activeSelf;
-        _teachSnap.wrongPanelActive = WrongPhotoPanel != null && WrongPhotoPanel.activeSelf;
-        _teachSnap.smileActive = smileTf != null && smileTf.gameObject.activeSelf;
-
-        _teachSnap.photoPanelActive = PhotoPanel != null && PhotoPanel.activeSelf;
-        _teachSnap.titlePanelActive = TitlePanel != null && TitlePanel.activeSelf;
-        _teachSnap.timeTextActive = timetext != null && timetext.gameObject.activeSelf;
-
-        _teachSnap.errorLightColor = ErrorLight != null ? ErrorLight.color : Color.clear;
-
-        if (cameraMoveControllScript != null && cameraMoveControllScript.cam != null)
-            _teachSnap.camPos = cameraMoveControllScript.cam.transform.position;
-
-        // 曝光：要能「讀」才有辦法存
-        if (fader != null) _teachSnap.exposure = fader.GetExposure(); // 下面我會說 fader 要補什麼
-    }
-    private void RestoreAfterTeaching()
-    {
-        if (_teachSnap == null) return;
-
-        if (Player != null) Player.SetActive(_teachSnap.playerActive);
-        if (cControllScript != null) cControllScript.playerControlEnabled = _teachSnap.playerControl;
-
-        if (PhonePanel != null) PhonePanel.SetActive(_teachSnap.phonePanelActive);
-        if (BlackPanel != null) BlackPanel.SetActive(_teachSnap.blackPanelActive);
-
-        if (ErrorPanel != null) ErrorPanel.SetActive(_teachSnap.errorPanelActive);
-        if (ErrorPlace != null) ErrorPlace.SetActive(_teachSnap.errorPlaceActive);
-        if (CirclePlace != null) CirclePlace.SetActive(_teachSnap.circlePlaceActive);
-
-        if (HintText != null) HintText.gameObject.SetActive(_teachSnap.hintActive);
-        if (PhotoFrameImage != null) PhotoFrameImage.gameObject.SetActive(_teachSnap.photoFrameActive);
-        if (CorrectPhotoPanel != null) CorrectPhotoPanel.SetActive(_teachSnap.correctPanelActive);
-        if (WrongPhotoPanel != null) WrongPhotoPanel.SetActive(_teachSnap.wrongPanelActive);
-        if (smileTf != null) smileTf.gameObject.SetActive(_teachSnap.smileActive);
-
-        if (PhotoPanel != null) PhotoPanel.SetActive(_teachSnap.photoPanelActive);
-        if (TitlePanel != null) TitlePanel.SetActive(_teachSnap.titlePanelActive);
-        if (timetext != null) timetext.gameObject.SetActive(_teachSnap.timeTextActive);
-
-        if (ErrorLight != null) ErrorLight.color = _teachSnap.errorLightColor;
-
-        if (cameraMoveControllScript != null && cameraMoveControllScript.cam != null)
-            cameraMoveControllScript.cam.transform.position = _teachSnap.camPos;
-
-        if (fader != null) fader.SetExposureImmediate(_teachSnap.exposure);
-
-        _teachSnap = null;
+        if (HintText != null)
+            HintText.gameObject.SetActive(false);
     }
 
     public IEnumerator Act_BusLightBright()
     {
-        //// 2) 鏡頭移動
-        //if (!dialogueSystemGame00Script.skipRequested)
-        //{
-        //    cameraMoveControllScript.cam.transform.position = StartPoint.position;
-        //    yield return StartCoroutine(cameraMoveControllScript.MoveCameraTo(TargetPoint.position, MoveSpeed));
-        //    yield return new WaitForSeconds(2f);
-        //}
-        //else
-        //{
-        //    // 直接到位
-        //    cameraMoveControllScript.cam.transform.position = TargetPoint.position;
-        //}
-        //ApplyCheckpointState(SceneCheckpoint.AfterCameraMove);
-        // 3) 車頂燈閃
-        if (!dialogueSystemGame00Script.skipRequested)
-        {
-            //3.車頂燈光閃爍
-            BusUpLightTotal.SetActive(false);
-            yield return new WaitForSeconds(0.05f);
-            BusUpLightTotal.SetActive(true);
-            yield return new WaitForSeconds(0.05f);
-            BusUpLightTotal.SetActive(false);
-            yield return new WaitForSeconds(0.05f);
-            BusUpLightTotal.SetActive(true);
-            yield return new WaitForSeconds(0.05f);
-            BusUpLightTotal.SetActive(false);
-            yield return new WaitForSeconds(0.5f);
-            BusUpLightTotal.SetActive(true);
-            yield return new WaitForSeconds(0.5f);
-        }
-        else
-        {
-            // 跳過後，燈光要跟「劇情看完」一致：最後是亮著
-            BusUpLightTotal.SetActive(true);
-        }
-        ApplyCheckpointState(SceneCheckpoint.AfterRoofBlink);
-    }
+        //3.車頂燈光閃爍
+        BusUpLightTotal.SetActive(false);
+        yield return new WaitForSeconds(0.05f);
+        BusUpLightTotal.SetActive(true);
+        yield return new WaitForSeconds(0.05f);
+        BusUpLightTotal.SetActive(false);
+        yield return new WaitForSeconds(0.05f);
+        BusUpLightTotal.SetActive(true);
+        yield return new WaitForSeconds(0.05f);
+        BusUpLightTotal.SetActive(false);
+        yield return new WaitForSeconds(0.5f);
+        BusUpLightTotal.SetActive(true);
+        yield return new WaitForSeconds(0.5f);
 
+        yield return new WaitForSeconds(1.5f);
+    }
     public IEnumerator Act_LightOn()
     {
         Debug.Log($"[SceneFlow] Start id={GetInstanceID()}");
-        stage = FlowStage.Cutscene;
-        //0.鎖連續跳過劇情
-        stage = FlowStage.Cutscene;
-        dialogueSystemGame00Script.allowFastReveal = false;
         //cameraMoveControllScript.cam.transform.position = StartPoint.position;
         // 1) 曝光淡入
         //if (!dialogueSystemGame00Script.skipRequested)
@@ -1378,25 +661,17 @@ public class First : MonoBehaviour
         //    // 直接把曝光設到「看完劇情後」一致
         //    fader.SetExposureImmediate(0.5f);
         //}
-        ApplyCheckpointState(SceneCheckpoint.AfterFadeIn);
     }
-
     public IEnumerator Act_LightBlack()
     {
-        // 1) 曝光淡入
-        //if (!dialogueSystemGame00Script.skipRequested)
-        //{
         fader.SetExposureImmediate(-10f);
-        yield return new WaitForSeconds(2f);
-        //}
-        //else
-        //{
-        //    // 直接把曝光設到「看完劇情後」一致
-        //    fader.SetExposureImmediate(0.5f);
-        //}
-    }
-    
+        Debug.Log($"[LightBlack] after set: {fader.GetExposure()} frame={Time.frameCount}");
 
+        yield return null; // 關鍵：等一幀，看看有沒有被改回去
+
+        Debug.Log($"[LightBlack] next frame: {fader.GetExposure()} frame={Time.frameCount}");
+        yield return new WaitForSeconds(2f);
+    }
 
     public IEnumerator Act_WalkToFront()
     {
@@ -1407,8 +682,6 @@ public class First : MonoBehaviour
         yield return new WaitUntil(() => cControllScript.autoMoveFinished);
         yield return new WaitForSeconds(1f);
     }
-
-
     public IEnumerator Act_HangUpPhone()
     {
         if (PhonePanel) PhonePanel.SetActive(false);
@@ -1429,7 +702,7 @@ public class First : MonoBehaviour
         if (cControllScript == null || cControllScript.animator == null) yield break;
 
         cControllScript.animator.SetBool("phone", true);
-        yield return WaitForAnimation(cControllScript.animator, "phone");
+        yield return WaitForClipEnd(cControllScript.animator, "phone");// ← 這裡填 clip 名
 
         if (PhonePanel != null) PhonePanel.SetActive(true);
         yield return new WaitForSeconds(1.5f);
@@ -1437,26 +710,17 @@ public class First : MonoBehaviour
 
         cControllScript.animator.SetBool("phone", false);
     }
-
-    public IEnumerator Act_WaitForTeach()
-    {
-        // 等教學開始
-        yield return new WaitUntil(() => teachRoutine != null);
-        // 等教學結束
-        yield return new WaitUntil(() => teachRoutine == null);
-    }
     public IEnumerator Act_PickPhoneOn()
     {
         if (cControllScript == null || cControllScript.animator == null) yield break;
 
         cControllScript.animator.SetBool("phone", true);
-        yield return WaitForAnimation(cControllScript.animator, "phone");
+        yield return WaitForClipEnd(cControllScript.animator, "phone");
         if (PhonePanel != null) PhonePanel.SetActive(true);
 
         // 不關，交給後面劇情關（或你再做 PickPhoneOff）
         //cControllScript.animator.SetBool("phone", false);
     }
-
     public IEnumerator Act_BlackPanelOn()
     {
         if (BlackPanel == null || animationScript == null) yield break;
@@ -1466,6 +730,15 @@ public class First : MonoBehaviour
         yield return new WaitForSeconds(1.5f);
     }
 
+    public IEnumerator Act_BlackPanelShutOff()
+    {
+        if (BlackPanel == null || animationScript == null) yield break;
+
+        BlackPanel.SetActive(true);
+        animationScript.Fade(BlackPanel, 0.1f, 0f, 1f, null);
+        yield return new WaitForSeconds(0.5f);
+    }
+    
     public IEnumerator Act_BlackPanelOn2()
     {
         if (BlackPanel22 == null || animationScript == null) yield break;
@@ -1474,18 +747,17 @@ public class First : MonoBehaviour
         animationScript.Fade(BlackPanel22, 1f, 0f, 1f, null);
         yield return new WaitForSeconds(1.5f);
     }
-
     public IEnumerator Act_BusShakeWithDamping(bool strong)
     {
-        if (busRb == null) yield break;
+        if (busVisualRoot == null) yield break;
 
-        Vector3 originPos = busRb.position;
-        Quaternion originRot = busRb.rotation;
+        Vector3 originLocalPos = busVisualRoot.localPosition;
+        Quaternion originLocalRot = busVisualRoot.localRotation;
 
         float duration = strong ? 1.4f : 0.9f;
 
-        float startPosAmp = strong ? 0.08f : 0.04f;
-        float startRotAmp = strong ? 6f : 3f;
+        float startPosAmp = strong ? 0.04f : 0.02f; // ✅視覺晃動建議小一點
+        float startRotAmp = strong ? 2.0f : 1.0f;   // ✅2~1度很夠騙了
 
         float frequency = strong ? 18f : 12f;
         float damping = strong ? 3.2f : 4.5f;
@@ -1494,66 +766,60 @@ public class First : MonoBehaviour
 
         while (t < duration)
         {
-            t += Time.fixedDeltaTime;
+            t += Time.deltaTime;
 
             float normalized = t / duration;
             float decay = Mathf.Exp(-damping * normalized);
             float shake = Mathf.Sin(t * frequency) * decay;
 
-            // ✅ 3D 位移：只晃 X/Y，不動 Z
             Vector3 offset = new Vector3(
                 shake * startPosAmp,
                 shake * startPosAmp * 0.4f,
                 0f
             );
 
-            // ✅ 3D 旋轉：用 Quaternion 疊加角度（這裡繞 Z 軸晃，像車身左右晃）
             float rotZ = shake * startRotAmp;
             Quaternion rot = Quaternion.Euler(0f, 0f, rotZ);
 
-            busRb.MovePosition(originPos + offset);
-            busRb.MoveRotation(originRot * rot);
+            busVisualRoot.localPosition = originLocalPos + offset;
+            busVisualRoot.localRotation = originLocalRot * rot;
 
-            yield return new WaitForFixedUpdate();
+            yield return null;
         }
 
-        // 回正
-        busRb.MovePosition(originPos);
-        busRb.MoveRotation(originRot);
+        busVisualRoot.localPosition = originLocalPos;
+        busVisualRoot.localRotation = originLocalRot;
     }
-
-
     public IEnumerator Act_BusShake(bool strong)
     {
-        if (busRb == null) yield break;
+        if (busVisualRoot == null) yield break;
 
-        Vector3 originPos = busRb.position;
-        Quaternion originRot = busRb.rotation;
+        Vector3 originLocalPos = busVisualRoot.localPosition;
+        Quaternion originLocalRot = busVisualRoot.localRotation;
 
         float duration = strong ? 0.9f : 0.5f;
-        float posAmp = strong ? 0.06f : 0.03f;
-        float rotAmp = strong ? 4f : 2f;
+        float posAmp = strong ? 0.03f : 0.015f;
+        float rotAmp = strong ? 1.5f : 0.8f;
 
         float t = 0f;
 
         while (t < duration)
         {
-            t += Time.fixedDeltaTime;
+            t += Time.deltaTime;
 
             float offsetX = Random.Range(-posAmp, posAmp);
             float offsetY = Random.Range(-posAmp * 0.5f, posAmp * 0.5f);
             float rotZ = Random.Range(-rotAmp, rotAmp);
 
-            busRb.MovePosition(originPos + new Vector3(offsetX, offsetY, 0f));
-            busRb.MoveRotation(originRot * Quaternion.Euler(0f, 0f, rotZ));
+            busVisualRoot.localPosition = originLocalPos + new Vector3(offsetX, offsetY, 0f);
+            busVisualRoot.localRotation = originLocalRot * Quaternion.Euler(0f, 0f, rotZ);
 
-            yield return new WaitForFixedUpdate();
+            yield return null;
         }
 
-        busRb.MovePosition(originPos);
-        busRb.MoveRotation(originRot);
+        busVisualRoot.localPosition = originLocalPos;
+        busVisualRoot.localRotation = originLocalRot;
     }
-
     public IEnumerator Act_BlackPanelOff()
     {
         if (BlackPanel == null || animationScript == null) yield break;
@@ -1562,7 +828,6 @@ public class First : MonoBehaviour
         yield return new WaitForSeconds(1.5f);
         BlackPanel.SetActive(false);
     }
-
     public IEnumerator Act_LightDimDown()
     {
         if (fader != null)
@@ -1572,6 +837,150 @@ public class First : MonoBehaviour
         }
             
     }
+    public IEnumerator Act_LeftRight()
+    {
+        //玩家裝有animator那個物件切換sprite到leftidle，然後用flip.x=true去做往右看的樣子，左右左右左右
+
+        //📝 註記
+        //這一段是你之前「用 sprite +flipX 偽動畫」的做法
+        //如果你之後改成純 Animator，這支可以直接刪
+
+        if (cControllScript == null || cControllScript.spriteRenderer == null)
+            yield break;
+
+        var sr = cControllScript.spriteRenderer;
+        var anim = cControllScript.animator;
+
+        // 暫停 Animator，避免被蓋掉
+        if (anim != null) anim.enabled = false;
+
+        sr.sprite = cControllScript.leftidle;
+        sr.flipX = false;
+        yield return new WaitForSeconds(1f);
+
+        sr.flipX = true;
+        yield return new WaitForSeconds(1f);
+
+        sr.flipX = false;
+        yield return new WaitForSeconds(1);
+
+        sr.sprite = cControllScript.idle;
+
+        // 還原 Animator
+        if (anim != null) anim.enabled = true;
+        yield return new WaitForSeconds(1.5f);
+    }
+    public IEnumerator Act_SetTimeText(string time)
+    {
+        //指定ShowTimeText為19:30
+        Timetext.gameObject.SetActive(true);
+        Timetext.GetComponent<Text>().text = time;
+        yield return new WaitForSeconds(1.5f);
+    }
+    public IEnumerator Act_ShowPhoto(GameObject target)
+    {
+        //PicturePanel 底下是 多張 Image，名字 = pictureName
+
+        //📝 註記
+        //這完全符合你現在「用編號 / 名字對應圖片」的做法
+        //未來你要改成 ScriptableObject 也不衝突
 
 
+        Debug.Log("showphoto");
+        // 先全關
+        foreach (Transform child in PicturePanel.transform)
+            child.gameObject.SetActive(false);
+        PicturePanel.SetActive(true);
+
+        // 再開指定那張
+        if (target != null)
+            target.gameObject.SetActive(true);
+        else
+            Debug.LogWarning($"[Act_ShowPhoto] 找不到圖片：{target.ToString()}");
+
+        yield return new WaitForSeconds(1.5f);
+    }
+
+    public IEnumerator Act_photoclose()
+    {
+        //PicturePanel 底下是 多張 Image，名字 = pictureName
+
+        //📝 註記
+        //這完全符合你現在「用編號 / 名字對應圖片」的做法
+        //未來你要改成 ScriptableObject 也不衝突
+
+
+        Debug.Log("showphoto");
+        // 先全關
+        foreach (Transform child in PicturePanel.transform)
+            child.gameObject.SetActive(false);
+        PicturePanel.SetActive(false);
+        yield return null;
+    }
+
+    public IEnumerator Act_BigPictureZoom()
+    {
+        //放大圖片某處，放大位置我會放一個transform，朝著那裏放大就可以了
+
+        //📝 註記
+        //這是「世界座標放大」，非常適合你現在的公車＋場景構圖
+        //你之後要改成 UI 放大，只要換這支
+
+        if (mainCamera == null || BigPictureZoomTarget == null)
+            yield break;
+
+        Vector3 camStartPos = mainCamera.transform.position;
+        Vector3 dir = (BigPictureZoomTarget.position - camStartPos).normalized;
+        Vector3 zoomPos = camStartPos + dir * zoomDistance;
+
+        float t = 0f;
+
+        // Zoom in
+        while (t < zoomDuration)
+        {
+            t += Time.deltaTime;
+            mainCamera.transform.position =
+                Vector3.Lerp(camStartPos, zoomPos, t / zoomDuration);
+            yield return null;
+        }
+
+        yield return new WaitForSeconds(zoomHoldTime);
+
+        t = 0f;
+        // Zoom out
+        while (t < zoomDuration)
+        {
+            t += Time.deltaTime;
+            mainCamera.transform.position =
+                Vector3.Lerp(zoomPos, camStartPos, t / zoomDuration);
+            yield return null;
+        }
+
+        mainCamera.transform.position = camStartPos;
+        yield return new WaitForSeconds(1.5f);
+    }
+    public IEnumerator Act_LightFlickerOnce()
+    {
+        //車內燈瞬間閃爍
+
+        //📝 註記
+        //這是「廉價但有效」的恐怖感
+        //非常符合你現在風格，不用上 shader
+
+        if (BusUpLightTotal == null) yield break;
+
+        BusUpLightTotal.SetActive(false);
+        yield return new WaitForSeconds(0.05f);
+        BusUpLightTotal.SetActive(true);
+        yield return new WaitForSeconds(0.05f);
+        BusUpLightTotal.SetActive(false);
+        yield return new WaitForSeconds(0.08f);
+        BusUpLightTotal.SetActive(true);
+        yield return new WaitForSeconds(1.5f);
+    }
+    public IEnumerator Act_ShowGameTitle()
+    {
+        GameName.SetActive(true);
+        yield return new WaitForSeconds(1.5f);
+    }
 }

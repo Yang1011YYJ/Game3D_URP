@@ -22,26 +22,18 @@ public class DialogueSystemGame00 : MonoBehaviour
     [Header("文本")]
     public TextAsset TextfileCurrent;
     public TextAsset TextfileGame00;
-    public TextAsset TextfileGame01;
     public TextAsset TextfileLookPhone;
 
     [Header("打字設定")]
     [Tooltip("控制打字節奏（字元出現的間隔時間）")]public float TextSpeed = 0.06f;
+    private Dictionary<string, int> labelToIndex = new Dictionary<string, int>();
+
 
     [Header("控制設定")]
     [Tooltip("物件啟用時是否自動開始播放對話")]public bool playOnEnable = false;
     [Tooltip("允許快速顯示內容")] public bool allowFastReveal;
     [Tooltip("第一段劇情撥完")] public bool FirstDiaFinished;
-
-    [Header("跳過")]
-    [Tooltip("跳過")] public bool skipRequested = false;
-    public SceneCheckpoint currentCP = SceneCheckpoint.Start;
-    public SceneCheckpoint skipToCP = SceneCheckpoint.Start;
-    [Tooltip("允許跳過教學")] public bool allowSkipTeaching = false;
-    public Dictionary<string, int> labelToIndex = new Dictionary<string, int>();
-    public bool jumpRequested = false;
-    public SceneCheckpoint jumpTarget = SceneCheckpoint.AfterDialogue;
-
+    [Tooltip("允許接收空白鍵")] public bool inputLocked = false;
 
 
     [Header("腳本")]
@@ -92,6 +84,7 @@ public class DialogueSystemGame00 : MonoBehaviour
     void Start()
     {
         SetPanels(false, false);
+        StartDialogue(TextfileGame00);
     }
 
     void Update()
@@ -104,7 +97,7 @@ public class DialogueSystemGame00 : MonoBehaviour
         //bool anyPanelOn =
         //    (TextPanel != null && TextPanel.activeSelf) ||
         //    (NarraTextPanel != null && NarraTextPanel.activeSelf);
-
+        if (inputLocked) return;
         if (!Input.GetKeyDown(KeyCode.Space)) return;
 
         if (isTyping)
@@ -292,7 +285,7 @@ public class DialogueSystemGame00 : MonoBehaviour
         }
     }
 
-    public void JumpToLabel(string labelKey, bool runImmediately = true)
+    public void JumpToLabel(string labelKey, bool runImmediately = true)//快速跳到某index
     {
         if (!labelToIndex.TryGetValue(labelKey, out int target))
         {
@@ -300,13 +293,21 @@ public class DialogueSystemGame00 : MonoBehaviour
             return;
         }
 
-        // 收乾淨，避免打字/面板殘留
         StopTyping();
         isTyping = false;
         isBusy = false;
         SetPanels(false, false);
 
         index = target;
+
+        // ✅ 跳過 label 本身
+        index++;
+
+        if (index >= TextList.Count)
+        {
+            FinishDialogue();
+            return;
+        }
 
         if (runImmediately)
             SetTextUI();
@@ -561,6 +562,7 @@ public class DialogueSystemGame00 : MonoBehaviour
                 break;
 
             case "LightBlack":
+                Debug.Log("1");
                 yield return owner.Act_LightBlack();
                 break;
 
@@ -610,6 +612,10 @@ public class DialogueSystemGame00 : MonoBehaviour
                 yield return owner.Act_BlackPanelOn();
                 break;
 
+            case "BlackPanelShutOff":
+                yield return owner.Act_BlackPanelShutOff();
+                break;
+
             case "BlackPanelOn2":
                 yield return owner.Act_BlackPanelOn2();
                 break;
@@ -618,16 +624,16 @@ public class DialogueSystemGame00 : MonoBehaviour
                 yield return owner.Act_BlackPanelOff();
                 break;
 
-            case "InTeach":
-                owner.RequestTeach1();
+            case "InTeach01"://判斷教學
+                owner.Act_RequestTeach1();
                 break;
 
-            case "WaitForTeach":
-                yield return owner.Act_WaitForTeach();
+            case "GameStart"://開始遊戲
+                yield return owner.Act_GameStart();
                 break;
 
-            case "Tutorial_AnomalyAppear":
-                owner.RequestTeach2();
+            case "InTeach02":
+                owner.Act_RequestTeach2();
                 break;
 
             case "Tutorial_ExplainInterrupted":
@@ -642,19 +648,23 @@ public class DialogueSystemGame00 : MonoBehaviour
                 break;
 
             case "TimeJump_1930":
-                owner.SetTimeText("19:30");
+                yield return owner.Act_SetTimeText("19:30");
                 break;
 
             case "ShowPhoto_S02_Photo_01b":
-                owner.ShowPhoto("S02_Photo_01b");
+                yield return owner.Act_ShowPhoto(firstScript.Picture02);
+                break;
+               
+            case "photoclose":
+                yield return owner.Act_photoclose();
                 break;
 
             case "bigpicture":
-                yield return owner.BigPictureZoom();
+                yield return owner.Act_BigPictureZoom();
                 break;
 
             case "LightFlicker":
-                yield return owner.LightFlickerOnce();
+                yield return owner.Act_LightFlickerOnce();
                 break;
 
             case "LightDimDown":
@@ -662,7 +672,7 @@ public class DialogueSystemGame00 : MonoBehaviour
                 break;
 
             case "ShowTitle_Game_Title":
-                yield return owner.ShowGameTitle();
+                yield return owner.Act_ShowGameTitle();
                 break;
 
             case "WalkToFront":

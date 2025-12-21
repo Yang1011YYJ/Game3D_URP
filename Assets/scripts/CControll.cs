@@ -162,7 +162,7 @@ public class CControll : MonoBehaviour
             animator.SetBool("walk", false);
             //spriteRenderer.sprite = image_0;
             // 沒在移動，用正面圖
-            spriteRenderer.flipX = false;
+            //spriteRenderer.flipX = false;
 
         }
     }
@@ -184,11 +184,20 @@ public class CControll : MonoBehaviour
         else
         {
             // 玩家控制：維持你原本的物理移動寫法
-            // 角色移動 & 限速
             rig.AddForce(new Vector3(x * moveSpeed, 0f, 0f), ForceMode.Acceleration);
 
             Vector3 v = rig.velocity;
-            v.x = Mathf.Clamp(v.x, -maxSpeed, maxSpeed);
+
+            if (Mathf.Abs(x) < 0.01f)
+            {
+                // ✅ 沒輸入時，直接停止水平速度（防漂移）
+                v.x = 0f;
+            }
+            else
+            {
+                v.x = Mathf.Clamp(v.x, -maxSpeed, maxSpeed);
+            }
+
             rig.velocity = v;
         }
         
@@ -215,13 +224,7 @@ public class CControll : MonoBehaviour
     {
         playerControlEnabled = true;
         isAutoMoving = false;
-    }
-
-    private void OnTriggerEnter2D(Collider2D collider)
-    {
-        if(collider.tag == "ET1")//第一個觸發error地點
-        {
-            firstScript.eT1 = true;
-        }
+        rig.velocity = Vector3.zero;
+        rig.angularVelocity = Vector3.zero;//鎖玩家控制」時，也順便清速度
     }
 }

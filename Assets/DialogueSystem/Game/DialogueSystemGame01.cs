@@ -20,6 +20,7 @@ public class DialogueSystemGame01 : MonoBehaviour
 
     [Header("文本")]
     public TextAsset TextfileCurrent;
+    public TextAsset TextfileGame01;
 
     [Header("打字")]
     public float TextSpeed = 0.06f;
@@ -293,16 +294,16 @@ public class DialogueSystemGame01 : MonoBehaviour
                 yield return ownerSecond.Act_BlackPanelOn();
                 break;
 
+            case "BlackPanelShutOff":
+                yield return ownerSecond.Act_BlackPanelShutOff();
+                break;
+
             case "BlackPanelOff":
                 yield return ownerSecond.Act_BlackPanelOff();
                 break;
 
             case "LightDimDown":
                 yield return ownerSecond.Act_LightDimDown();
-                break;
-
-            case "Play_FindSpotsRound":
-                yield return ownerSecond.Act_PlayFindSpotsRound();
                 break;
 
             default:
