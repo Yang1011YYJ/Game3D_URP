@@ -3536,7 +3536,7 @@ SpriteRenderer:
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: -638848449
-  m_SortingLayer: 3
+  m_SortingLayer: 2
   m_SortingOrder: 0
   m_Sprite: {fileID: -2555380, guid: 80c58d42d429a0b46ad53a3977148306, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -4749,7 +4749,7 @@ Light:
   m_Type: 2
   m_Shape: 0
   m_Color: {r: 0.735849, g: 0.735849, b: 0.735849, a: 1}
-  m_Intensity: 1.94
+  m_Intensity: 0.75
   m_Range: 0.6691201
   m_SpotAngle: 75.591995
   m_InnerSpotAngle: 21.80208
@@ -5746,7 +5746,7 @@ Light:
   m_Type: 1
   m_Shape: 0
   m_Color: {r: 0.6509434, g: 0.6509434, b: 0.6509434, a: 1}
-  m_Intensity: 0.53
+  m_Intensity: 1.46
   m_Range: 10
   m_SpotAngle: 45
   m_InnerSpotAngle: 21.80208
