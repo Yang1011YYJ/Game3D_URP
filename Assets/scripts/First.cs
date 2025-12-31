@@ -1,7 +1,8 @@
 ﻿using System.Collections;
-using UnityEngine;
 using TMPro;
+using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Video;
 
 public enum GamePhase
 {
@@ -40,7 +41,8 @@ public class First : MonoBehaviour
     public GameObject PhonePanel;
     [Tooltip("玩家對話框還看的到")]public GameObject BlackPanel;
     [Tooltip("玩家對話框看不到")] public GameObject BlackPanel22;
-    [Tooltip("遊戲名字")] public GameObject GameName;
+    [Tooltip("遊戲名字")] public VideoPlayer GameNamevideoPlayer;
+    [Tooltip("遊戲名字Rawimage")] public RawImage GameNameRawImage;
     [Tooltip("遊戲內劇情用的時間")] public GameObject Timetext;
 
     [Header("Big Picture Zoom放大圖片功能")]
@@ -72,6 +74,7 @@ public class First : MonoBehaviour
     public GameObject Player;
     public GameObject PlayerWithAni;
     [Tooltip("跑到前面去看司機")]public Transform WalkToFrontPos;
+    [Tooltip("為了不要被遮住移動一下")] public Transform WalkToPos2;
     public Transform PlayerStartPos;
 
     [Header("車子相關")]
@@ -130,6 +133,7 @@ public class First : MonoBehaviour
         PhotoFrameTeachTarget01.gameObject.SetActive(false);
         PhotoFrameTeachTarget02.gameObject.SetActive(false);
         inTeach01 = false;
+        GameNamevideoPlayer.loopPointReached += OnVideoEnd;
 
         //更新數量
         TotalFoundChangedUI(spotManager.totalFound);
@@ -158,6 +162,7 @@ public class First : MonoBehaviour
 
         ErrorPanel.SetActive(true);
         animationScript.Fade(ErrorPanel, 1, 0, 1, null);
+        yield return new WaitForSeconds(1.5f);
         PhotoFrameImage.gameObject.SetActive(true);
         PhotoFrameTeachTarget.gameObject.SetActive(true);
         PhonePanel.gameObject.SetActive(false);
@@ -253,6 +258,7 @@ public class First : MonoBehaviour
     {
         // TODO: 教學1內容
         PhotoFrameTeachTarget = PhotoFrameTeachTarget01;
+        PhotoFrameTeachTarget.gameObject.SetActive(true);
         yield return null;
         teachRoutine = null;
     }
@@ -473,8 +479,9 @@ public class First : MonoBehaviour
         if (ErrorPanel != null) ErrorPanel.SetActive(false);
         if (RedPanel != null) RedPanel.SetActive(false);
         if (PicturePanel != null) PicturePanel.SetActive(false);
-        if (GameName != null) GameName.SetActive(false);
+        if (GameNameRawImage != null) GameNameRawImage.gameObject.SetActive(false);
         if (Timetext != null) Timetext.SetActive(false);
+        Picture02.SetActive(false);
     }
 
     private void CleanupRoundUI()//關掉遊戲會用到的UI
@@ -636,6 +643,16 @@ public class First : MonoBehaviour
         yield return new WaitUntil(() => cControllScript.autoMoveFinished);
         yield return new WaitForSeconds(1f);
     }
+    public IEnumerator Act_WalkToPos2()
+    {
+        if (cControllScript == null || WalkToPos2 == null) yield break;
+
+        cControllScript.StartAutoMoveTo(WalkToPos2.position);
+
+        yield return new WaitUntil(() => cControllScript.autoMoveFinished);
+        yield return new WaitForSeconds(1f);
+    }
+    
     public IEnumerator Act_HangUpPhone()
     {
         if (PhonePanel) PhonePanel.SetActive(false);
@@ -658,9 +675,7 @@ public class First : MonoBehaviour
         cControllScript.animator.SetBool("phone", true);
         yield return WaitForClipEnd(cControllScript.animator, "phone");// ← 這裡填 clip 名
 
-        if (PhonePanel != null) PhonePanel.SetActive(true);
         yield return new WaitForSeconds(1.5f);
-        if (PhonePanel != null) PhonePanel.SetActive(false);
 
         cControllScript.animator.SetBool("phone", false);
     }
@@ -855,6 +870,18 @@ public class First : MonoBehaviour
         yield return new WaitForSeconds(1.5f);
     }
 
+    public IEnumerator Act_picture2Open()
+    {
+        
+        // 再開指定那張
+        if (Picture02 != null)
+            Picture02.gameObject.SetActive(true);
+        else
+            Debug.LogWarning($"[Act_ShowPhoto] 找不到圖片：{Picture02.ToString()}");
+
+        yield return new WaitForSeconds(1.5f);
+    }
+
     public IEnumerator Act_photoclose()
     {
         //PicturePanel 底下是 多張 Image，名字 = pictureName
@@ -935,7 +962,15 @@ public class First : MonoBehaviour
     }
     public IEnumerator Act_ShowGameTitle()
     {
-        GameName.SetActive(true);
-        yield return new WaitForSeconds(1.5f);
+        GameNamevideoPlayer.Play();
+        animationScript.Fade(GameNameRawImage.gameObject, 1, 0, 1, null);
+        
+        yield return new WaitForSeconds(2.5f);
+    }
+
+    void OnVideoEnd(VideoPlayer vp)
+    {
+        Debug.Log("影片播放結束");
+        // 可以接續其他邏輯，例如對話、切場景
     }
 }

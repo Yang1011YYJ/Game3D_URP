@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using TMPro;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.UI;
 using static UnityEngine.GraphicsBuffer;
@@ -10,6 +11,15 @@ public class Second : MonoBehaviour
 {
     [Header("Phase")]
     public GamePhase currentPhase = GamePhase.Playing;//一定要設值不然會是0或是第一個
+    public enum EndingIntent
+    {
+        None,
+        Success,
+        Fail
+    }
+
+    private EndingIntent _pendingEnding = EndingIntent.None;
+
 
     [Header("腳本")]
     public SpotManager spotManager;
@@ -86,7 +96,12 @@ public class Second : MonoBehaviour
     private int _prevLives = -1;
     private bool _gameStarted = false;
 
+    [Header("相機相關")]
+    [Tooltip("Focal length")] public float targetFocal;
+    [Tooltip("移動速度")] public float speed;
 
+    [Header("其他")]
+    public Camera cam;
 
     private void Awake()
     {
@@ -419,7 +434,13 @@ public class Second : MonoBehaviour
         {
             yield return StartCoroutine(HandleSuccess());
             CleanupRoundUI();
-            yield return null;
+
+            // 1️⃣ 先確保畫面回到遊戲場景（淡出黑幕）
+            yield return StartCoroutine(Act_BlackPanelOff());
+
+            // ⭐ 回合間的呼吸時間（你要的 5 秒）
+            yield return new WaitForSeconds(5f);
+
             CheckFinalResultOrContinue();
             yield break;
         }
@@ -471,24 +492,32 @@ public class Second : MonoBehaviour
     {
         if (spotManager.IsWin())
         {
-            Debug.Log("[First] GAME WIN");
+            Debug.Log("[Second] GAME WIN → play ending story");
             currentPhase = GamePhase.End;
 
-            StartCoroutine(GoToWinScene());
+            _pendingEnding = EndingIntent.Success;
+
+            // 播放通關劇情
+            dialogueSystemGame01Script.keepTalk = true;
+            dialogueSystemGame01Script.nextDialogue = dialogueSystemGame01Script.TextfileGame04;
             return;
         }
 
         if (spotManager.IsGameEnded())
         {
-            Debug.Log("[First] GAME OVER");
+            Debug.Log("[Second] GAME OVER → play fail story");
             currentPhase = GamePhase.End;
 
-            StartCoroutine(GoToLoseScene());
+            _pendingEnding = EndingIntent.Fail;
+
+            // 播放失敗劇情
+            dialogueSystemGame01Script.keepTalk = true;
+            dialogueSystemGame01Script.nextDialogue = dialogueSystemGame01Script.TextfileGame03;
             return;
         }
 
         // 還沒結束 → 等劇情再呼叫下一次 GameStart
-        Debug.Log("[First] Round finished, wait for story");
+        Debug.Log("[Second] Round finished, wait for next story");
     }
 
     private IEnumerator GoToWinScene()
@@ -755,9 +784,34 @@ public class Second : MonoBehaviour
             HintText.gameObject.SetActive(false);
     }
 
-    public IEnumerator Act_BusLightBright()
+
+
+
+
+    // =====================================================
+    // 🎬 Second 專用劇情演出 Action
+    // =====================================================
+
+    // =====================================================
+    // 燈光效果
+    // =====================================================
+    public IEnumerator Act_RedLight()// 紅光警告（失誤 / jumpscare 前導）
     {
-        //3.車頂燈光閃爍
+        
+        if (RedPanel == null) yield break;
+
+        RedPanel.SetActive(true);
+        yield return new WaitForSeconds(0.15f);
+        RedPanel.SetActive(false);
+        yield return new WaitForSeconds(0.1f);
+        RedPanel.SetActive(true);
+        yield return new WaitForSeconds(0.2f);
+        RedPanel.SetActive(false);
+        yield return new WaitForSeconds(1.5f);
+    }
+    public IEnumerator Act_BusLightBright()//3.車頂燈光閃爍
+    {
+        
         BusUpLightTotal.SetActive(false);
         yield return new WaitForSeconds(0.05f);
         BusUpLightTotal.SetActive(true);
@@ -771,7 +825,26 @@ public class Second : MonoBehaviour
         BusUpLightTotal.SetActive(true);
         yield return new WaitForSeconds(0.5f);
     }
-    public IEnumerator Act_LightOn()
+    public IEnumerator Act_LightFlickerOnce()
+    {
+        //車內燈瞬間閃爍
+
+        //📝 註記
+        //這是「廉價但有效」的恐怖感
+        //非常符合你現在風格，不用上 shader
+
+        if (BusUpLightTotal == null) yield break;
+
+        BusUpLightTotal.SetActive(false);
+        yield return new WaitForSeconds(0.05f);
+        BusUpLightTotal.SetActive(true);
+        yield return new WaitForSeconds(0.05f);
+        BusUpLightTotal.SetActive(false);
+        yield return new WaitForSeconds(0.08f);
+        BusUpLightTotal.SetActive(true);
+        yield return new WaitForSeconds(1.5f);
+    }//3.車頂燈光閃爍
+    public IEnumerator Act_LightOn()//global light開燈
     {
         Debug.Log($"[SceneFlow] Start id={GetInstanceID()}");
         //cameraMoveControllScript.cam.transform.position = StartPoint.position;
@@ -787,29 +860,53 @@ public class Second : MonoBehaviour
         //    fader.SetExposureImmediate(0.5f);
         //}
     }
-    public IEnumerator Act_LightBlack()
-    {
-        // 1) 曝光淡入
-        //if (!dialogueSystemGame00Script.skipRequested)
-        //{
-        fader.SetExposureImmediate(-10f);
-        yield return new WaitForSeconds(2f);
-        //}
-        //else
-        //{
-        //    // 直接把曝光設到「看完劇情後」一致
-        //    fader.SetExposureImmediate(0.5f);
-        //}
-    }
-    //public IEnumerator Act_WalkToFront()
+    //public IEnumerator Act_LightBlack()//global light關燈
     //{
-    //    if (cControllScript == null || WalkToFrontPos == null) yield break;
-
-    //    cControllScript.StartAutoMoveTo(WalkToFrontPos.position);
-
-    //    yield return new WaitUntil(() => cControllScript.autoMoveFinished);
-    //    yield return new WaitForSeconds(1f);
+    //    // 1) 曝光淡入
+    //    //if (!dialogueSystemGame00Script.skipRequested)
+    //    //{
+    //    fader.SetExposureImmediate(-10f);
+    //    yield return new WaitForSeconds(2f);
+    //    //}
+    //    //else
+    //    //{
+    //    //    // 直接把曝光設到「看完劇情後」一致
+    //    //    fader.SetExposureImmediate(0.5f);
+    //    //}
     //}
+
+    public IEnumerator Act_BuslightCloseOneByOne()// 公車內燈一顆一顆關掉
+    {
+        // 公車內燈一顆一顆關掉（不追求精準，只要氣氛）
+        if (BusUpLightTotal == null) yield break;
+
+        int childCount = BusUpLightTotal.transform.childCount;
+
+        for (int i = 0; i < childCount; i++)
+        {
+            Transform light = BusUpLightTotal.transform.GetChild(i);
+            light.gameObject.SetActive(false);
+
+            if (i == childCount - 1)
+                yield return new WaitForSeconds(0.8f); // 最後一顆拉長
+            else
+                yield return new WaitForSeconds(0.3f);// 每顆燈之間的節奏
+        }
+
+        yield return new WaitForSeconds(1.5f);
+    }
+    public IEnumerator Act_LightDimDown()//global light關燈
+    {
+        if (fader != null)
+        {
+            yield return StartCoroutine(fader.FadeExposure(1.5f, 0.5f, -10f));
+            yield return new WaitForSeconds(2f);
+        }
+
+    }
+    // =====================================================
+    // 手機效果
+    // =====================================================
     public IEnumerator Act_HangUpPhone()
     {
         if (PhonePanel) PhonePanel.SetActive(false);
@@ -849,7 +946,11 @@ public class Second : MonoBehaviour
         // 不關，交給後面劇情關（或你再做 PickPhoneOff）
         //cControllScript.animator.SetBool("phone", false);
     }
-    public IEnumerator Act_BlackPanelOn()
+
+    // =====================================================
+    // 畫面控制效果
+    // =====================================================
+    public IEnumerator Act_BlackPanelOn()//玩家對話框會露出來的那個黑幕淡入
     {
         if (BlackPanel == null || animationScript == null) yield break;
 
@@ -857,8 +958,30 @@ public class Second : MonoBehaviour
         animationScript.Fade(BlackPanel, 1f, 0f, 1f, null);
         yield return new WaitForSeconds(1.5f);
     }
+    public IEnumerator Act_CameraBack()// 鏡頭拉遠
+    {
+        // 確保是 Physical Camera
+        cam.usePhysicalProperties = true;
 
-    public IEnumerator Act_BlackPanelShutOff()
+        float current = cam.focalLength;
+
+        while (Mathf.Abs(current - targetFocal) > 0.01f)
+        {
+            current = Mathf.MoveTowards(
+                current,
+                targetFocal,
+                speed * Time.deltaTime
+            );
+
+            cam.focalLength = current;
+            yield return null;
+        }
+
+        cam.focalLength = targetFocal; // 保險收尾
+        yield return new WaitForSeconds(1.5f); // 等一幀，確保位置同步
+    }
+
+    public IEnumerator Act_BlackPanelShutOff()//玩家對話框會露出來的那個黑幕瞬間淡入
     {
         if (BlackPanel == null || animationScript == null) yield break;
 
@@ -866,7 +989,7 @@ public class Second : MonoBehaviour
         animationScript.Fade(BlackPanel, 0.1f, 0f, 1f, null);
         yield return new WaitForSeconds(0.5f);
     }
-    public IEnumerator Act_BlackPanelOn2()
+    public IEnumerator Act_BlackPanelOn2()//所有UI都看不到的黑幕淡入
     {
         if (BlackPanel22 == null || animationScript == null) yield break;
 
@@ -874,6 +997,18 @@ public class Second : MonoBehaviour
         animationScript.Fade(BlackPanel22, 1f, 0f, 1f, null);
         yield return new WaitForSeconds(1.5f);
     }
+    public IEnumerator Act_BlackPanelOff()//玩家對話框會露出來的那個黑幕淡出
+    {
+        if (BlackPanel == null || animationScript == null) yield break;
+
+        animationScript.Fade(BlackPanel, 1f, 1f, 0f, null);
+        yield return new WaitForSeconds(1.5f);
+        BlackPanel.SetActive(false);
+    }
+
+    // =====================================================
+    // 公車物理效果
+    // =====================================================
     public IEnumerator Act_BusShakeWithDamping(bool strong)
     {
         if (busRb == null) yield break;
@@ -950,24 +1085,52 @@ public class Second : MonoBehaviour
         busRb.MovePosition(originPos);
         busRb.MoveRotation(originRot);
     }
-    public IEnumerator Act_BlackPanelOff()
-    {
-        if (BlackPanel == null || animationScript == null) yield break;
 
-        animationScript.Fade(BlackPanel, 1f, 1f, 0f, null);
+    // =====================================================
+    // 場景控制
+    // =====================================================
+    public IEnumerator Act_FailScene()// 失敗轉場（淡黑 → 切場）
+    {
+        
+        if (BlackPanel == null || animationScript == null || sceneChangeScript == null)
+            yield break;
+
+        BlackPanel.SetActive(true);
+
+        animationScript.Fade(
+            BlackPanel,
+            1f,
+            0f,
+            1f,
+            () => sceneChangeScript.SceneC("fail")
+        );
+
         yield return new WaitForSeconds(1.5f);
-        BlackPanel.SetActive(false);
     }
-    public IEnumerator Act_LightDimDown()
-    {
-        if (fader != null)
-        {
-            yield return StartCoroutine(fader.FadeExposure(1.5f, 0.5f, -10f));
-            yield return new WaitForSeconds(2f);
-        }
 
+    public IEnumerator Act_SuccessScene()// 通關轉場（淡黑 → 切場）
+    {
+
+        if (BlackPanel == null || animationScript == null || sceneChangeScript == null)
+            yield break;
+
+        BlackPanel.SetActive(true);
+
+        animationScript.Fade(
+            BlackPanel,
+            1f,
+            0f,
+            1f,
+            () => sceneChangeScript.SceneC("success")
+        );
+
+        yield return new WaitForSeconds(1.5f);
     }
-    public IEnumerator Act_LeftRight()
+
+    // =====================================================
+    // 人物相關效果(包含物理和動畫)
+    // =====================================================
+    public IEnumerator Act_LeftRight()//玩家往左右看
     {
         //玩家裝有animator那個物件切換sprite到leftidle，然後用flip.x=true去做往右看的樣子，左右左右左右
         //📝 註記
@@ -999,6 +1162,29 @@ public class Second : MonoBehaviour
         if (anim != null) anim.enabled = true;
         yield return new WaitForSeconds(1.5f);
     }
+    public IEnumerator Act_idle()
+    {
+        // 還原 Animator
+        if (cControllScript.animator != null) cControllScript.animator.enabled = true;
+        //所有 bool → 預設值
+        //所有 trigger → 清空
+        //回到 Default State
+        //連 IK / Root Motion 都一起重置
+        cControllScript.animator.Rebind();
+        cControllScript.animator.Update(0f);
+        yield return new WaitForSeconds(1);
+    }
+    public IEnumerator Act_PlayerToDie()//玩家死亡動畫
+    {
+        if (cControllScript.animator == null) yield break;
+
+        cControllScript.animator.SetBool("die", true);
+        yield return new WaitForSeconds(2.5f);//動畫兩秒
+    }
+
+    // =====================================================
+    // 其他細節效果
+    // =====================================================
     public IEnumerator Act_SetTimeText(string time)
     {
         //指定ShowTimeText為19:30
@@ -1084,28 +1270,20 @@ public class Second : MonoBehaviour
     //    mainCamera.transform.position = camStartPos;
     //    yield return new WaitForSeconds(1.5f);
     //}
-    public IEnumerator Act_LightFlickerOnce()
-    {
-        //車內燈瞬間閃爍
-
-        //📝 註記
-        //這是「廉價但有效」的恐怖感
-        //非常符合你現在風格，不用上 shader
-
-        if (BusUpLightTotal == null) yield break;
-
-        BusUpLightTotal.SetActive(false);
-        yield return new WaitForSeconds(0.05f);
-        BusUpLightTotal.SetActive(true);
-        yield return new WaitForSeconds(0.05f);
-        BusUpLightTotal.SetActive(false);
-        yield return new WaitForSeconds(0.08f);
-        BusUpLightTotal.SetActive(true);
-        yield return new WaitForSeconds(1.5f);
-    }
+    
     //public IEnumerator Act_ShowGameTitle()
     //{
     //    GameName.SetActive(true);
     //    yield return new WaitForSeconds(1.5f);
+    //}
+
+    //public IEnumerator Act_WalkToFront()
+    //{
+    //    if (cControllScript == null || WalkToFrontPos == null) yield break;
+
+    //    cControllScript.StartAutoMoveTo(WalkToFrontPos.position);
+
+    //    yield return new WaitUntil(() => cControllScript.autoMoveFinished);
+    //    yield return new WaitForSeconds(1f);
     //}
 }

@@ -4,7 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class DialogueSystemGame01 : MonoBehaviour
+public class DialogueSystemGame02 : MonoBehaviour
 {
     [Header("ownerSecond")]
     public Second ownerSecond; // ✅ 拖 Second 進來
@@ -20,9 +20,8 @@ public class DialogueSystemGame01 : MonoBehaviour
 
     [Header("文本")]
     public TextAsset TextfileCurrent;
-    [Tooltip("關卡開始前的劇情")]public TextAsset TextfileGame01;
-    [Tooltip("遊戲失敗的劇情")] public TextAsset TextfileGame03;
-    [Tooltip("遊戲通關的劇情")] public TextAsset TextfileGame04;
+    [Tooltip("遊戲失敗劇情")]public TextAsset TextfileGame03;
+    [Tooltip("遊戲通關劇情")] public TextAsset TextfileGame04;
 
     [Header("打字")]
     public float TextSpeed = 0.06f;
@@ -35,10 +34,6 @@ public class DialogueSystemGame01 : MonoBehaviour
     [Header("自動播放設定")]
     [Tooltip("true 就自動下一行")] public bool autoNextLine = false;
     [Tooltip("每行播完後停多久再自動下一行")] public float autoNextDelay = 0.5f;
-
-    [Header("劇情控制")]
-    public bool keepTalk = false;       // 開關：是否要接續劇情
-    public TextAsset nextDialogue;      // 要接續的劇情檔
 
     [Header("旁白保留模式")]
     public bool narraSticky = false;        // 開著就不清空旁白
@@ -68,7 +63,6 @@ public class DialogueSystemGame01 : MonoBehaviour
     {
         SetPanels(false, false);
 
-        TextfileCurrent = TextfileGame01;
         if (playOnEnable && TextfileCurrent != null)
             StartDialogue(TextfileCurrent);
     }
@@ -76,18 +70,7 @@ public class DialogueSystemGame01 : MonoBehaviour
     void Update()
     {
         if (isBusy) return;
-        if (!anyPanelOn()) return;// 如果任何面板開著，才接受空白鍵跳過或下一行
-
-        if (keepTalk)
-        {
-            keepTalk = false; // 避免重複觸發
-            if (nextDialogue != null)
-            {
-                StartDialogue(nextDialogue);
-                nextDialogue = null;
-            }
-            return;
-        }
+        if (!anyPanelOn()) return;
 
         if (!Input.GetKeyDown(KeyCode.Space)) return;
 
@@ -282,32 +265,29 @@ public class DialogueSystemGame01 : MonoBehaviour
             yield break;
         }
 
-        string key = actionKey.Trim();
-        int paren = key.IndexOf('(');
-        if (paren >= 0) key = key.Substring(0, paren).Trim();
-
         // ✅ 只保留 Second 會用到的 Act
-        switch (key)
+        switch (actionKey)
         {
-            //燈光控制
             case "LightOn":
                 yield return ownerSecond.Act_LightOn();
                 break;
 
-            case "LightDimDown":
-                yield return ownerSecond.Act_LightDimDown();
+            case "BusLightBright":
+                yield return ownerSecond.Act_BusLightBright();
                 break;
 
-            case "RedLight":
-                yield return ownerSecond.Act_RedLight();
+            //case "WalkToFront":
+            //    yield return ownerSecond.Act_WalkToFront();
+            //    break;
+
+            case "PickPhone":
+                yield return ownerSecond.Act_PickPhone();
                 break;
 
-            case "BuslightCloseOneByOne":
-                yield return ownerSecond.Act_BuslightCloseOneByOne();
+            case "HangUpPhone":
+                yield return ownerSecond.Act_HangUpPhone();
                 break;
-            //燈光控制
 
-            //黑畫面與節奏控制與畫面控制
             case "BlackPanelOn":
                 yield return ownerSecond.Act_BlackPanelOn();
                 break;
@@ -320,98 +300,20 @@ public class DialogueSystemGame01 : MonoBehaviour
                 yield return ownerSecond.Act_BlackPanelOff();
                 break;
 
-            case "waitforSecs":
-                // 從 actionText 抓第一個數字，抓不到就預設 2 秒
-                float sec = ExtractFirstNumber(actionKey, 2f);
-                yield return new WaitForSeconds(sec);
+            case "LightDimDown":
+                yield return ownerSecond.Act_LightDimDown();
                 break;
 
-            case "CameraBack":
-                yield return ownerSecond.Act_CameraBack();
-                break;
-            //黑畫面與節奏控制
-
-            //遊戲相關
             case "SelectRound": 
                 yield return ownerSecond.Act_SelectRound(); 
                 break;
 
-            case "GameStart":
-                yield return ownerSecond.Act_GameStart();
-                break;
-
-            case "FailScene":
-                yield return ownerSecond.Act_FailScene();
-                break;
-
-            case "SuccessScene":
-                yield return ownerSecond.Act_SuccessScene();
-                break;
-            //遊戲相關
-
-            //手機系統
-            case "PickPhone":
-                yield return ownerSecond.Act_PickPhone();
-                break;
-
-            case "PickPhoneOn":
-                yield return ownerSecond.Act_PickPhoneOn();
-                break;
-
-            case "HangUpPhone":
-                yield return ownerSecond.Act_HangUpPhone();
-                break;
-            //手機系統
-
-            //公車相關
-            case "BusShake":
-                yield return ownerSecond.Act_BusShake(true);
-                break;
-            //公車相關
-
-            //角色相關
-            case "LeftRight":
-                yield return ownerSecond.Act_LeftRight();
-                break;
-
-            case "idle":
-                yield return ownerSecond.Act_idle();
-                break;
-                
-            case "PlayerToDie":
-                yield return ownerSecond.Act_PlayerToDie();
-                break;
-            //角色相關
+            
 
             default:
                 Debug.LogWarning("[DialogueSystemGame00] Unhandled action key: " + actionKey);
                 break;
         }
-    }
-
-    private float ExtractFirstNumber(string s, float fallback)
-    {
-        // 找到第一段連續數字（含小數點）
-        bool found = false;
-        string num = "";
-        for (int i = 0; i < s.Length; i++)
-        {
-            char c = s[i];
-            if (char.IsDigit(c) || (c == '.' && found))
-            {
-                found = true;
-                num += c;
-            }
-            else if (found)
-            {
-                break;
-            }
-        }
-
-        if (float.TryParse(num, out float v))
-            return v;
-
-        return fallback;
     }
 
     public void StopTyping()

@@ -656,7 +656,7 @@ public class DialogueSystemGame00 : MonoBehaviour
                 break;
 
             case "ShowPhoto_S02_Photo_01b":
-                yield return owner.Act_ShowPhoto(firstScript.Picture02);
+                yield return owner.Act_picture2Open();
                 break;
                
             case "photoclose":

@@ -1,6 +1,4 @@
 ﻿1
-LightBlack
-1
 eyeclose
 1
 LightOn
@@ -76,6 +74,8 @@ BusShakeWithDamping
 怎麼回事？
 0
 剛剛……是我做了什麼嗎？
+1
+WalkToPos2
 1
 ShowPhoto_S02_Photo_01b(照片出現)
 0
