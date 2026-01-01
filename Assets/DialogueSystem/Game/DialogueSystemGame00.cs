@@ -135,63 +135,6 @@ public class DialogueSystemGame00 : MonoBehaviour
 
     [SerializeField] private string mandatoryLabelPrefix = "Label_MUST_";
 
-    // 從目前 index 往後找「下一個必到 label」的位置
-    public int FindNextMandatoryLabelIndex(int fromIndex)
-    {
-        int start = Mathf.Clamp(fromIndex + 1, 0, TextList.Count - 1);
-
-        for (int i = start; i < TextList.Count; i++)
-        {
-            if (TextList[i].code != LineCode.Action) continue;
-
-            string key = TextList[i].content.Trim();
-            if (key.StartsWith(mandatoryLabelPrefix))
-                return i;
-        }
-        return -1;
-    }
-
-    public bool SkipByEsc_ToNextMustOrEnd()
-    {
-        // 沒對話資料就不處理
-        if (TextList == null || TextList.Count == 0) return false;
-
-        // 停掉打字與正在跑的動作（避免卡狀態）
-        StopTyping();
-        isTyping = false;
-        isBusy = false;
-
-        // 找下一個 MUST label
-        int target = FindNextMandatoryLabelIndex(index);
-
-        if (target < 0)
-        {
-            // ✅ 沒有 MUST label：直接視為對話結束
-            index = TextList.Count;     // 讓狀態符合你說的「index==count」
-            FinishDialogue();
-            return true;
-        }
-
-        // ✅ 有 MUST label：跳過去，但別卡在 label 本身
-        // 先把面板收乾淨（避免殘影）
-        SetPanels(false, false);
-
-        index = target;
-
-        // ⭐ 這一步很關鍵：避免停在 Label_ 那行需要再按空白
-        index++;
-
-        // 如果剛好 label 是最後一行（極少，但保險）
-        if (index >= TextList.Count)
-        {
-            FinishDialogue();
-            return true;
-        }
-
-        SetTextUI();  // 從 label 後一行開始繼續跑（例如 InTeach）
-        return true;
-    }
-
 
     //public bool SkipToNextMandatoryLabel()
     //{
@@ -582,7 +525,6 @@ public class DialogueSystemGame00 : MonoBehaviour
                 if (cControllScript != null && cControllScript.animator != null)
                 {
                     cControllScript.animator.SetBool("eyeclose", false);
-                    firstScript.Player.transform.position = firstScript.PlayerStartPos.position;
                     yield return new WaitForSeconds(1.5f);
                 }
                 break;

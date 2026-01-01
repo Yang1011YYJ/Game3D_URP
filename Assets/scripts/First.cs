@@ -45,6 +45,10 @@ public class First : MonoBehaviour
     [Tooltip("遊戲名字Rawimage")] public RawImage GameNameRawImage;
     [Tooltip("遊戲內劇情用的時間")] public GameObject Timetext;
 
+    [Header("設定")]
+    [Tooltip("設定面板")] public GameObject SettingPanel;
+    [Tooltip("快速劇情")] public GameObject FastRevealButton;
+
     [Header("Big Picture Zoom放大圖片功能")]
     public Transform BigPictureZoomTarget;
     public Camera mainCamera;
@@ -111,6 +115,19 @@ public class First : MonoBehaviour
 
         if (dialogueSystemGame00Script != null)
             dialogueSystemGame00Script.BindOwner(this);
+
+        CleanupUI();//關掉所有UI
+        //教學UI關掉
+        CleanupRoundUI();
+        PhotoFrameTeachTarget01.gameObject.SetActive(false);
+        PhotoFrameTeachTarget02.gameObject.SetActive(false);
+        SettingPanel.SetActive(false );
+        inTeach01 = false;
+        GameNamevideoPlayer.loopPointReached += OnVideoEnd;
+        Player.transform.position = PlayerStartPos.position;
+
+        //更新數量
+        TotalFoundChangedUI(spotManager.totalFound);
     }
 
     private void OnEnable()
@@ -127,16 +144,7 @@ public class First : MonoBehaviour
 
     private void Start()
     {
-        CleanupUI();//關掉所有UI
-        //教學UI關掉
-        CleanupRoundUI();
-        PhotoFrameTeachTarget01.gameObject.SetActive(false);
-        PhotoFrameTeachTarget02.gameObject.SetActive(false);
-        inTeach01 = false;
-        GameNamevideoPlayer.loopPointReached += OnVideoEnd;
-
-        //更新數量
-        TotalFoundChangedUI(spotManager.totalFound);
+        
 
     }
 
@@ -144,6 +152,20 @@ public class First : MonoBehaviour
     {
         if (photoFrameFollowEnabled)
             FollowPointer(PhotoFrameRect);
+
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            Debug.Log("1");
+            SettingPanel.SetActive(!SettingPanel.activeSelf);
+        }
+    }
+    //======================================================
+    //設定相關細節
+    //======================================================
+    public void FastOK()//快速通過劇情
+    {
+        dialogueSystemGame00Script.allowFastReveal = !dialogueSystemGame00Script.allowFastReveal;
+        Debug.Log(dialogueSystemGame00Script.allowFastReveal.ToString());
     }
 
 
@@ -258,7 +280,8 @@ public class First : MonoBehaviour
     {
         // TODO: 教學1內容
         PhotoFrameTeachTarget = PhotoFrameTeachTarget01;
-        PhotoFrameTeachTarget.gameObject.SetActive(true);
+        PicturePanel.SetActive(true);
+        Picture01.SetActive(true);
         yield return null;
         teachRoutine = null;
     }
@@ -270,6 +293,8 @@ public class First : MonoBehaviour
 
         PhotoFrameTeachTarget01.gameObject.SetActive(false);
         PhotoFrameTeachTarget02.gameObject.SetActive(true);
+        HintText.gameObject.GetComponent<CanvasGroup>().alpha = 1;
+        PhotoFrameImage.GetComponent<CanvasGroup>().alpha = 1;
         yield return null;
         teachRoutine = null;
     }
@@ -277,6 +302,8 @@ public class First : MonoBehaviour
     {
         PhotoFrameTeachTarget01.gameObject.SetActive(false);
         PhotoFrameTeachTarget02.gameObject.SetActive(false);
+        Picture01.gameObject.SetActive(false);
+        Picture02.gameObject.SetActive(false);
 
         //EnablePhotoFrameFollow();
         //HideTeachHint();
@@ -436,8 +463,13 @@ public class First : MonoBehaviour
 
         
         yield return new WaitForSeconds(1f);
+        Picture02.gameObject.SetActive(false);
+        Picture01.gameObject.SetActive(false);
         animationScript.Fade(ErrorPanel, 2, 1, 0, null);
+        animationScript.Fade(HintText.gameObject, 2, 1, 0, null);
+        animationScript.Fade(PhotoFrameImage, 2, 1, 0, null);
         PicturePanel.gameObject.SetActive(false);
+
         dialogueSystemGame00Script.inputLocked = false; // 教學結束
         yield return new WaitForSeconds(3f);
         CleanupRoundUI();
@@ -482,6 +514,7 @@ public class First : MonoBehaviour
         if (GameNameRawImage != null) GameNameRawImage.gameObject.SetActive(false);
         if (Timetext != null) Timetext.SetActive(false);
         Picture02.SetActive(false);
+        Picture01.SetActive(false);
     }
 
     private void CleanupRoundUI()//關掉遊戲會用到的UI
@@ -491,6 +524,8 @@ public class First : MonoBehaviour
         if (PhotoFrameImage != null) PhotoFrameImage.SetActive(false);
         if (HintText != null) HintText.gameObject.SetActive(false);
         countText.gameObject.SetActive(false);
+        PhotoFrameTeachTarget01.gameObject .SetActive(false);
+        PhotoFrameTeachTarget02.gameObject .SetActive(false);
     }
 
     // =====================================================
@@ -589,6 +624,34 @@ public class First : MonoBehaviour
         }
     }
 
+    public IEnumerator PlayReverse(string stateName, float duration)//倒著播放動畫
+    {
+        Animator anim = cControllScript.animator;
+
+        float t = 1f;
+        while (t > 0f)
+        {
+            anim.Play(stateName, 0, t);
+            t -= Time.deltaTime / duration;
+            yield return null;
+        }
+
+        anim.Play(stateName, 0, 0f);
+    }
+
+
+
+    //===========================================
+    //Action動作
+    //===========================================
+
+
+
+
+
+    //===========================================
+    //光線控制
+    //===========================================
     public IEnumerator Act_BusLightBright()
     {
         //3.車頂燈光閃爍
@@ -633,7 +696,38 @@ public class First : MonoBehaviour
         Debug.Log($"[LightBlack] next frame: {fader.GetExposure()} frame={Time.frameCount}");
         yield return new WaitForSeconds(2f);
     }
+    public IEnumerator Act_LightDimDown()
+    {
+        if (fader != null)
+        {
+            yield return StartCoroutine(fader.FadeExposure(1.5f, 0.5f, -10f));
+            yield return new WaitForSeconds(2f);
+        }
 
+    }
+    public IEnumerator Act_LightFlickerOnce()
+    {
+        //車內燈瞬間閃爍
+
+        //📝 註記
+        //這是「廉價但有效」的恐怖感
+        //非常符合你現在風格，不用上 shader
+
+        if (BusUpLightTotal == null) yield break;
+
+        BusUpLightTotal.SetActive(false);
+        yield return new WaitForSeconds(0.05f);
+        BusUpLightTotal.SetActive(true);
+        yield return new WaitForSeconds(0.05f);
+        BusUpLightTotal.SetActive(false);
+        yield return new WaitForSeconds(0.08f);
+        BusUpLightTotal.SetActive(true);
+        yield return new WaitForSeconds(1.5f);
+    }
+
+    //============================================
+    //玩家相關物理和動畫
+    //============================================
     public IEnumerator Act_WalkToFront()
     {
         if (cControllScript == null || WalkToFrontPos == null) yield break;
@@ -651,160 +745,6 @@ public class First : MonoBehaviour
 
         yield return new WaitUntil(() => cControllScript.autoMoveFinished);
         yield return new WaitForSeconds(1f);
-    }
-    
-    public IEnumerator Act_HangUpPhone()
-    {
-        if (PhonePanel) PhonePanel.SetActive(false);
-
-        if (cControllScript.animator != null)
-            cControllScript.animator.SetBool("phone", false);
-
-        //cControllScript.animator.Play("phone", 0, 1f);   // 從最後一幀開始
-        //cControllScript.animator.speed = -1f;          // 反向播放
-        //yield return new WaitUntil(() => cControllScript.animator.GetCurrentAnimatorStateInfo(0).normalizedTime <= 0f);
-        //cControllScript.animator.speed = 1f; // 記得還原
-
-
-        yield return new WaitForSeconds(1f);
-    }
-    public IEnumerator Act_PickPhone()
-    {
-        if (cControllScript == null || cControllScript.animator == null) yield break;
-
-        cControllScript.animator.SetBool("phone", true);
-        yield return WaitForClipEnd(cControllScript.animator, "phone");// ← 這裡填 clip 名
-
-        yield return new WaitForSeconds(1.5f);
-
-        cControllScript.animator.SetBool("phone", false);
-    }
-    public IEnumerator Act_PickPhoneOn()
-    {
-        if (cControllScript == null || cControllScript.animator == null) yield break;
-
-        cControllScript.animator.SetBool("phone", true);
-        yield return WaitForClipEnd(cControllScript.animator, "phone");
-        if (PhonePanel != null) PhonePanel.SetActive(true);
-
-        // 不關，交給後面劇情關（或你再做 PickPhoneOff）
-        //cControllScript.animator.SetBool("phone", false);
-    }
-    public IEnumerator Act_BlackPanelOn()
-    {
-        if (BlackPanel == null || animationScript == null) yield break;
-
-        BlackPanel.SetActive(true);
-        animationScript.Fade(BlackPanel, 1f, 0f, 1f, null);
-        yield return new WaitForSeconds(1.5f);
-    }
-
-    public IEnumerator Act_BlackPanelShutOff()
-    {
-        if (BlackPanel == null || animationScript == null) yield break;
-
-        BlackPanel.SetActive(true);
-        animationScript.Fade(BlackPanel, 0.1f, 0f, 1f, null);
-        yield return new WaitForSeconds(0.5f);
-    }
-    
-    public IEnumerator Act_BlackPanelOn2()
-    {
-        if (BlackPanel22 == null || animationScript == null) yield break;
-
-        BlackPanel22.SetActive(true);
-        animationScript.Fade(BlackPanel22, 1f, 0f, 1f, null);
-        yield return new WaitForSeconds(1.5f);
-    }
-    public IEnumerator Act_BusShakeWithDamping(bool strong)
-    {
-        if (busVisualRoot == null) yield break;
-
-        Vector3 originLocalPos = busVisualRoot.localPosition;
-        Quaternion originLocalRot = busVisualRoot.localRotation;
-
-        float duration = strong ? 1.4f : 0.9f;
-
-        float startPosAmp = strong ? 0.04f : 0.02f; // ✅視覺晃動建議小一點
-        float startRotAmp = strong ? 2.0f : 1.0f;   // ✅2~1度很夠騙了
-
-        float frequency = strong ? 18f : 12f;
-        float damping = strong ? 3.2f : 4.5f;
-
-        float t = 0f;
-
-        while (t < duration)
-        {
-            t += Time.deltaTime;
-
-            float normalized = t / duration;
-            float decay = Mathf.Exp(-damping * normalized);
-            float shake = Mathf.Sin(t * frequency) * decay;
-
-            Vector3 offset = new Vector3(
-                shake * startPosAmp,
-                shake * startPosAmp * 0.4f,
-                0f
-            );
-
-            float rotZ = shake * startRotAmp;
-            Quaternion rot = Quaternion.Euler(0f, 0f, rotZ);
-
-            busVisualRoot.localPosition = originLocalPos + offset;
-            busVisualRoot.localRotation = originLocalRot * rot;
-
-            yield return null;
-        }
-
-        busVisualRoot.localPosition = originLocalPos;
-        busVisualRoot.localRotation = originLocalRot;
-    }
-    public IEnumerator Act_BusShake(bool strong)
-    {
-        if (busVisualRoot == null) yield break;
-
-        Vector3 originLocalPos = busVisualRoot.localPosition;
-        Quaternion originLocalRot = busVisualRoot.localRotation;
-
-        float duration = strong ? 0.9f : 0.5f;
-        float posAmp = strong ? 0.03f : 0.015f;
-        float rotAmp = strong ? 1.5f : 0.8f;
-
-        float t = 0f;
-
-        while (t < duration)
-        {
-            t += Time.deltaTime;
-
-            float offsetX = Random.Range(-posAmp, posAmp);
-            float offsetY = Random.Range(-posAmp * 0.5f, posAmp * 0.5f);
-            float rotZ = Random.Range(-rotAmp, rotAmp);
-
-            busVisualRoot.localPosition = originLocalPos + new Vector3(offsetX, offsetY, 0f);
-            busVisualRoot.localRotation = originLocalRot * Quaternion.Euler(0f, 0f, rotZ);
-
-            yield return null;
-        }
-
-        busVisualRoot.localPosition = originLocalPos;
-        busVisualRoot.localRotation = originLocalRot;
-    }
-    public IEnumerator Act_BlackPanelOff()
-    {
-        if (BlackPanel == null || animationScript == null) yield break;
-
-        animationScript.Fade(BlackPanel, 1f, 1f, 0f, null);
-        yield return new WaitForSeconds(1.5f);
-        BlackPanel.SetActive(false);
-    }
-    public IEnumerator Act_LightDimDown()
-    {
-        if (fader != null)
-        {
-            yield return StartCoroutine(fader.FadeExposure(1.5f, 0.5f, -10f));
-            yield return new WaitForSeconds(2f);
-        }
-            
     }
     public IEnumerator Act_LeftRight()
     {
@@ -839,11 +779,94 @@ public class First : MonoBehaviour
         if (anim != null) anim.enabled = true;
         yield return new WaitForSeconds(1.5f);
     }
+
+    //=============================================
+    //手機操作
+    //=============================================
+    public IEnumerator Act_HangUpPhone()
+    {
+        if (PhonePanel) PhonePanel.SetActive(false);
+
+        StartCoroutine(PlayReverse("phone", 2f));//倒著播放動畫
+        yield return new WaitForSeconds(2.5f);
+        if (cControllScript.animator != null)
+            cControllScript.animator.SetBool("phone", false);
+
+        //cControllScript.animator.Play("phone", 0, 1f);   // 從最後一幀開始
+        //cControllScript.animator.speed = -1f;          // 反向播放
+        //yield return new WaitUntil(() => cControllScript.animator.GetCurrentAnimatorStateInfo(0).normalizedTime <= 0f);
+        //cControllScript.animator.speed = 1f; // 記得還原
+
+
+        yield return new WaitForSeconds(1f);
+    }
+    public IEnumerator Act_PickPhone()
+    {
+        if (cControllScript == null || cControllScript.animator == null) yield break;
+
+        cControllScript.animator.SetBool("phone", true);
+        yield return WaitForClipEnd(cControllScript.animator, "phone");// ← 這裡填 clip 名
+
+        yield return new WaitForSeconds(1.5f);
+
+        cControllScript.animator.SetBool("phone", false);
+    }
+    public IEnumerator Act_PickPhoneOn()
+    {
+        if (cControllScript == null || cControllScript.animator == null) yield break;
+
+        cControllScript.animator.SetBool("phone", true);
+        yield return WaitForClipEnd(cControllScript.animator, "phone");
+        //if (PhonePanel != null) PhonePanel.SetActive(true);
+
+        // 不關，交給後面劇情關（或你再做 PickPhoneOff）
+        //cControllScript.animator.SetBool("phone", false);
+    }
+
+    //=============================================
+    //畫面控制
+    //=============================================
+    public IEnumerator Act_BlackPanelOn()
+    {
+        if (BlackPanel == null || animationScript == null) yield break;
+
+        BlackPanel.SetActive(true);
+        animationScript.Fade(BlackPanel, 1f, 0f, 1f, null);
+        yield return new WaitForSeconds(1.5f);
+    }
+    public IEnumerator Act_BlackPanelOff()
+    {
+        if (BlackPanel == null || animationScript == null) yield break;
+
+        animationScript.Fade(BlackPanel, 1f, 1f, 0f, null);
+        yield return new WaitForSeconds(1.5f);
+        BlackPanel.SetActive(false);
+    }
+
+    public IEnumerator Act_BlackPanelShutOff()
+    {
+        if (BlackPanel == null || animationScript == null) yield break;
+
+        BlackPanel.SetActive(true);
+        animationScript.Fade(BlackPanel, 0.1f, 0f, 1f, null);
+        yield return new WaitForSeconds(0.5f);
+    }
+    
+    public IEnumerator Act_BlackPanelOn2()
+    {
+        if (BlackPanel22 == null || animationScript == null) yield break;
+
+        BlackPanel22.SetActive(true);
+        animationScript.Fade(BlackPanel22, 1f, 0f, 1f, null);
+        yield return new WaitForSeconds(1.5f);
+    }
     public IEnumerator Act_SetTimeText(string time)
     {
         //指定ShowTimeText為19:30
         Timetext.gameObject.SetActive(true);
-        Timetext.GetComponent<TextMeshProUGUI>().text = time;
+        Timetext.GetComponentInChildren<TextMeshProUGUI>().text = "19:00";
+        yield return new WaitForSeconds(1);
+        Timetext.GetComponentInChildren<TextMeshProUGUI>().text = time;
         yield return new WaitForSeconds(1.5f);
     }
     public IEnumerator Act_ShowPhoto(GameObject target)
@@ -872,7 +895,7 @@ public class First : MonoBehaviour
 
     public IEnumerator Act_picture2Open()
     {
-        
+
         // 再開指定那張
         if (Picture02 != null)
             Picture02.gameObject.SetActive(true);
@@ -941,32 +964,98 @@ public class First : MonoBehaviour
         mainCamera.transform.position = camStartPos;
         yield return new WaitForSeconds(1.5f);
     }
-    public IEnumerator Act_LightFlickerOnce()
-    {
-        //車內燈瞬間閃爍
-
-        //📝 註記
-        //這是「廉價但有效」的恐怖感
-        //非常符合你現在風格，不用上 shader
-
-        if (BusUpLightTotal == null) yield break;
-
-        BusUpLightTotal.SetActive(false);
-        yield return new WaitForSeconds(0.05f);
-        BusUpLightTotal.SetActive(true);
-        yield return new WaitForSeconds(0.05f);
-        BusUpLightTotal.SetActive(false);
-        yield return new WaitForSeconds(0.08f);
-        BusUpLightTotal.SetActive(true);
-        yield return new WaitForSeconds(1.5f);
-    }
     public IEnumerator Act_ShowGameTitle()
     {
+        GameNameRawImage.gameObject.SetActive(true);
         GameNamevideoPlayer.Play();
         animationScript.Fade(GameNameRawImage.gameObject, 1, 0, 1, null);
-        
-        yield return new WaitForSeconds(2.5f);
+
+        yield return new WaitForSeconds(6.5f);
+        animationScript.Fade(GameNameRawImage.gameObject, 1, 1, 0, null);
+        yield return new WaitForSeconds(1.5f);
+        GameNameRawImage.gameObject.SetActive(false);
     }
+
+    //=============================================
+    //公車物理控制
+    //=============================================
+    public IEnumerator Act_BusShakeWithDamping(bool strong)
+    {
+        if (busVisualRoot == null) yield break;
+
+        Vector3 originLocalPos = busVisualRoot.localPosition;
+        Quaternion originLocalRot = busVisualRoot.localRotation;
+
+        float duration = strong ? 1.4f : 0.9f;
+
+        float startPosAmp = strong ? 0.04f : 0.02f; // ✅視覺晃動建議小一點
+        float startRotAmp = strong ? 2.0f : 1.0f;   // ✅2~1度很夠騙了
+
+        float frequency = strong ? 18f : 12f;
+        float damping = strong ? 3.2f : 4.5f;
+
+        float t = 0f;
+
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+
+            float normalized = t / duration;
+            float decay = Mathf.Exp(-damping * normalized);
+            float shake = Mathf.Sin(t * frequency) * decay;
+
+            Vector3 offset = new Vector3(
+                shake * startPosAmp,
+                shake * startPosAmp * 0.4f,
+                0f
+            );
+
+            float rotZ = shake * startRotAmp;
+            Quaternion rot = Quaternion.Euler(0f, 0f, rotZ);
+
+            busVisualRoot.localPosition = originLocalPos + offset;
+            busVisualRoot.localRotation = originLocalRot * rot;
+
+            yield return null;
+        }
+
+        busVisualRoot.localPosition = originLocalPos;
+        busVisualRoot.localRotation = originLocalRot;
+    }
+    public IEnumerator Act_BusShake(bool strong)
+    {
+        if (busVisualRoot == null) yield break;
+
+        Vector3 originLocalPos = busVisualRoot.localPosition;
+        Quaternion originLocalRot = busVisualRoot.localRotation;
+
+        float duration = strong ? 0.9f : 0.5f;
+        float posAmp = strong ? 0.03f : 0.015f;
+        float rotAmp = strong ? 1.5f : 0.8f;
+
+        float t = 0f;
+
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+
+            float offsetX = Random.Range(-rotAmp, rotAmp);
+            float offsetY = Random.Range(-posAmp * 0.5f, posAmp * 0.5f);
+            float rotZ =  Random.Range(-posAmp, posAmp);
+
+            busVisualRoot.localPosition = originLocalPos + new Vector3(offsetX, offsetY, 0f);
+            busVisualRoot.localRotation = originLocalRot * Quaternion.Euler(0f, 0f, rotZ);
+
+            yield return null;
+        }
+
+        busVisualRoot.localPosition = originLocalPos;
+        busVisualRoot.localRotation = originLocalRot;
+    }
+    
+    
+    
+   
 
     void OnVideoEnd(VideoPlayer vp)
     {

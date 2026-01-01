@@ -18,6 +18,8 @@ LeftRight
 PickPhone
 0
 奇怪，手機也沒訊號……
+1
+HangUpPhone
 2
 手機不在服務區內，時間停在晚上7點整,公車裡一個乘客也沒有。
 2
@@ -69,7 +71,7 @@ HangUpPhone
 1
 BlackPanelOff(燈光恢復正常)
 1
-BusShakeWithDamping
+BusShake
 0
 怎麼回事？
 0
@@ -115,7 +117,7 @@ GameStart(開始遊戲，會判斷這是不是教學:教學中，等回到遊戲
 1
 BlackPanelOff(燈光恢復正常)
 1
-BusShakeWithDamping
+BusShake
 0
 呼……呼……
 1
