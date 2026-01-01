@@ -36,11 +36,9 @@ public class Second : MonoBehaviour
     public GameObject RedPanel;
     public GameObject PhotoFrameImage;
     public TextMeshProUGUI HintText;
-    public GameObject PicturePanel;
-    public GameObject Picture01;
-    public GameObject Picture02;
     [Tooltip("Round UI")]
     public TextMeshProUGUI countText; // 顯示「找到 X / >5」
+    public GameObject CountTextImage;
     [Header("Background Click")]
     public GameObject BackgroundButton; // 透明全螢幕 Button 的 GameObject
 
@@ -59,6 +57,7 @@ public class Second : MonoBehaviour
     [Tooltip("玩家對話框看不到")] public GameObject BlackPanel22;
     [Tooltip("遊戲名字")] public GameObject GameName;
     [Tooltip("遊戲內劇情用的時間")] public GameObject Timetext;
+    public GameObject TimetextImage;
 
     [Header("Photo Frame Follow")]
     [Tooltip("拍照框本體")] public RectTransform PhotoFrameRect;     // 拍照框本體
@@ -186,10 +185,11 @@ public class Second : MonoBehaviour
         _roundFinished = false;
         _roundFlowDone = false;
 
-        //ErrorPanel.SetActive(true);
-        //animationScript.Fade(ErrorPanel, 1, 0, 1, null);
+        ErrorPanel.SetActive(true);
+        animationScript.Fade(ErrorPanel, 1, 0, 1, null);
         PhotoFrameImage.gameObject.SetActive(true);
         PhonePanel.gameObject.SetActive(false);
+        yield return new WaitForSeconds(1.5f);
 
         // ✅（重點）鎖對話系統輸入，避免空白鍵亂跳
         dialogueSystemGame01Script.inputLocked = true; // 開始
@@ -242,7 +242,9 @@ public class Second : MonoBehaviour
         _prevLives = spotManager.livesLeft;  // ✅ 這回合開始先記住 lives
 
         RedPanel.gameObject.SetActive(false);
-        HintText.text = "";
+        HintText.gameObject.SetActive(true);
+        HintText.gameObject.GetComponent<CanvasGroup>().alpha = 1;
+        HintText.text = "請在15秒內點擊異常!";
         OpenErrorPanel();     // ✅ 保證 ErrorPanel 會亮
         animationScript.Fade(ErrorPanel,1, 0, 1, null);
         yield return new WaitForSeconds(1.5f);
@@ -250,7 +252,7 @@ public class Second : MonoBehaviour
         // ✅ 保證拍照框會出現且跟隨
         EnablePhotoFrameFollow();
         EnableBackgroundClick();
-        HideTeachHint();
+        //HideTeachHint();
 
         // 開回合
         spotManager.BeginRound();
@@ -307,6 +309,7 @@ public class Second : MonoBehaviour
         if (HintText != null)
         {
             HintText.gameObject.SetActive(true);
+            HintText.gameObject.GetComponent<CanvasGroup>().alpha = 1;
             HintText.text = "在時間內找出異常！";
         }
         selectFinish = true;
@@ -338,12 +341,12 @@ public class Second : MonoBehaviour
         yield return null;
     }
 
-    public void Btn_SelectAndStart()
-    {
-        StartCoroutine(SelectAndStartRoutine());
-    }
+    //public void Btn_SelectAndStart()
+    //{
+    //    StartCoroutine(SelectAndStartRoutine());
+    //}
 
-    private IEnumerator SelectAndStartRoutine()
+    public IEnumerator SelectAndStartRoutine()
     {
         yield return StartCoroutine(Act_SelectRound());
         yield return StartCoroutine(Act_GameStart());
@@ -433,59 +436,28 @@ public class Second : MonoBehaviour
         if (endType == RoundEndType.FoundSpot)
         {
             yield return StartCoroutine(HandleSuccess());
-            CleanupRoundUI();
-
-            // 1️⃣ 先確保畫面回到遊戲場景（淡出黑幕）
-            yield return StartCoroutine(Act_BlackPanelOff());
-
-            // ⭐ 回合間的呼吸時間（你要的 5 秒）
-            yield return new WaitForSeconds(5f);
-
-            CheckFinalResultOrContinue();
-            yield break;
         }
-        // ✅ FailedRound：跑「死亡演出」再跳 fail
-        yield return StartCoroutine(DeathEndFlow());
-        yield break;
-    }
-    private IEnumerator DeathEndFlow()//遊戲失敗
-    {
-        // 0) 保險：停止互動、停止倒數
-        spotManager.PauseRound();
-        if (timer != null)
+        else
         {
-            timer.onTimeUp = null;
-            timer.ForceEnd();
+            yield return StartCoroutine(HandleFailure());
         }
 
-        
 
-        // 2) 提示文字
-        if (HintText != null)
-        {
-            HintText.gameObject.SetActive(true);
-            HintText.text = $"失敗！剩餘機會：{spotManager.livesLeft}";
-        }
-        // 1) jumpscare（紅閃）
-        yield return FlashJumpScare();
-        yield return new WaitForSeconds(1.5f);
-
-        // 2) 關掉找異常畫面，回到「正常車內」畫面
+        // 2️⃣ 回合 UI 清乾淨（畫面回到正常狀態）
         CleanupRoundUI();
-        photoFrameFollowEnabled = false;
 
-        // 你如果想留一句提示也可以（可選）
-        //if (HintText != null)
-        //{
-        //    HintText.gameObject.SetActive(true);
-        //    HintText.text = "……你被抓到了。";
-        //}
+        // 3 先確保畫面回到遊戲場景（淡出黑幕）
+        yield return StartCoroutine(Act_BlackPanelOff());
 
-        // 3) 讓玩家「看到回到車內」一下（很重要，恐怖片節奏）
-        yield return new WaitForSeconds(2f);
+        // ⭐ 回合間的呼吸時間（你要的 5 秒）
+        yield return new WaitForSeconds(5f);
 
-        // 4) 淡出 → 切 fail
-        StartCoroutine(GoToLoseScene());
+        // 4️⃣ 現在才判斷最終結局
+        CheckFinalResultOrContinue();
+
+        //// ✅ FailedRound：跑「死亡演出」再跳 fail
+        //yield return StartCoroutine(DeathEndFlow());
+        //yield break;
     }
 
     private void CheckFinalResultOrContinue()//判斷是通關還是失敗
@@ -503,7 +475,7 @@ public class Second : MonoBehaviour
             return;
         }
 
-        if (spotManager.IsGameEnded())
+        else if (spotManager.IsGameEnded())
         {
             Debug.Log("[Second] GAME OVER → play fail story");
             currentPhase = GamePhase.End;
@@ -515,9 +487,13 @@ public class Second : MonoBehaviour
             dialogueSystemGame01Script.nextDialogue = dialogueSystemGame01Script.TextfileGame03;
             return;
         }
+        else
+        {
+            // ⭐ 關鍵補齊點
+            Debug.Log("[Second] Continue to next round");
 
-        // 還沒結束 → 等劇情再呼叫下一次 GameStart
-        Debug.Log("[Second] Round finished, wait for next story");
+            StartCoroutine(SelectAndStartRoutine());
+        }
     }
 
     private IEnumerator GoToWinScene()
@@ -556,6 +532,7 @@ public class Second : MonoBehaviour
         if (countText == null || spotManager == null) return;
 
         countText.gameObject.SetActive(true); // 要不要顯示你可控
+        CountTextImage.SetActive(true);
         countText.text = $"{totalFound} / {spotManager.totalRounds}";
     }
 
@@ -578,10 +555,10 @@ public class Second : MonoBehaviour
         if (HintText != null)
         {
             HintText.gameObject.SetActive(true);
-            HintText.text = $"失敗！剩餘機會：{livesLeft}";
+            HintText.text = $"這裡沒有異常！剩餘機會：{livesLeft}";
         }
         // 1) jumpscare
-        yield return StartCoroutine(FlashJumpScare());
+        yield return StartCoroutine(HandleFailure());
         yield return new WaitForSeconds(1.5f);
 
         // 3) 如果還有命 → 重計時繼續同一回合
@@ -594,7 +571,8 @@ public class Second : MonoBehaviour
             timer.StartCountdown(roundSeconds);
 
             yield return new WaitForSeconds(0.2f);
-            if (HintText != null) HintText.gameObject.SetActive(false);
+            HintText.gameObject.SetActive(true);
+            HintText.text = "再試一次!";
 
             spotManager.ResumeRound();
             yield break;
@@ -644,9 +622,11 @@ public class Second : MonoBehaviour
         //更新數量
         TotalFoundChangedUI(spotManager.totalFound);
 
-
+        //關卡畫面淡出
         yield return new WaitForSeconds(1f);
-        //animationScript.Fade(ErrorPanel, 2, 1, 0, null);
+        animationScript.Fade(ErrorPanel, 2, 1, 0, null);
+        animationScript.Fade(HintText.gameObject, 2, 1, 0, null);
+        animationScript.Fade(PhotoFrameImage, 2, 1, 0, null);
         currentDef.spotRoot.SetActive(false);
         animationScript.Fade(currentDef.questionImage.gameObject, 2, 1, 0, null);
         yield return new WaitForSeconds(3f);
@@ -656,14 +636,21 @@ public class Second : MonoBehaviour
 
     }
 
-    private IEnumerator FlashJumpScare()//點錯位置跳jumpscare
+    private IEnumerator HandleFailure()//點錯位置跳jumpscare
     {
         Debug.Log("[Second] Failure feedback:jumpscare");
 
         if (RedPanel != null)
         {
             RedPanel.SetActive(true);
-            yield return new WaitForSeconds(1f);
+            yield return new WaitForSeconds(0.05f);
+            RedPanel.SetActive(false);
+            yield return new WaitForSeconds(0.05f);
+            RedPanel.SetActive(true);
+            yield return new WaitForSeconds(0.05f);
+            RedPanel.SetActive(false);
+            yield return new WaitForSeconds(0.05f);
+            RedPanel.SetActive(true);
         }
 
     }
@@ -683,9 +670,9 @@ public class Second : MonoBehaviour
         if (BlackPanel22 != null) BlackPanel22.SetActive(false);
         if (ErrorPanel != null) ErrorPanel.SetActive(false);
         if (RedPanel != null) RedPanel.SetActive(false);
-        if (PicturePanel != null) PicturePanel.SetActive(false);
         if (GameName != null) GameName.SetActive(false);
         if (Timetext != null) Timetext.SetActive(false);
+        TimetextImage.SetActive(false);
     }
 
     private void CleanupRoundUI()//關掉遊戲會用到的面板
@@ -702,6 +689,7 @@ public class Second : MonoBehaviour
         if (PhotoFrameImage != null) PhotoFrameImage.SetActive(false);
         if (HintText != null) HintText.gameObject.SetActive(false);
         countText.gameObject.SetActive(false);
+        CountTextImage.SetActive(false);
         hasSelectedRound = false;
     }
 
@@ -712,7 +700,11 @@ public class Second : MonoBehaviour
     private void EnablePhotoFrameFollow()//拍照框跟隨滑鼠
     {
         if (PhotoFrameImage != null)
+        {
             PhotoFrameImage.SetActive(true);
+            PhotoFrameImage.GetComponent<CanvasGroup>().alpha = 1;
+        }
+            
 
         photoFrameFollowEnabled = true;
 
@@ -1189,47 +1181,11 @@ public class Second : MonoBehaviour
     {
         //指定ShowTimeText為19:30
         Timetext.gameObject.SetActive(true);
+        TimetextImage.SetActive(true);
         Timetext.GetComponent<TextMeshProUGUI>().text = time;
         yield return new WaitForSeconds(1.5f);
     }
-    public IEnumerator Act_ShowPhoto(GameObject target)
-    {
-        //顯示圖片
-        //📝 註記
-        //這完全符合你現在「用編號 / 名字對應圖片」的做法
-        //未來你要改成 ScriptableObject 也不衝突
 
-
-        Debug.Log("showphoto");
-        // 先全關
-        foreach (Transform child in PicturePanel.transform)
-            child.gameObject.SetActive(false);
-        PicturePanel.SetActive(true);
-
-        // 再開指定那張
-        if (target != null)
-            target.gameObject.SetActive(true);
-        else
-            Debug.LogWarning($"[Act_ShowPhoto] 找不到圖片：{target.ToString()}");
-        yield return new WaitForSeconds(1.5f);
-    }
-    public IEnumerator Act_photoclose()
-    {
-        //PicturePanel 底下是 多張 Image，名字 = pictureName
-
-        //📝 註記
-        //這完全符合你現在「用編號 / 名字對應圖片」的做法
-        //未來你要改成 ScriptableObject 也不衝突
-
-
-        Debug.Log("showphoto");
-        // 先全關
-        foreach (Transform child in PicturePanel.transform)
-            child.gameObject.SetActive(false);
-        //Picture02.SetActive(false);
-        PicturePanel.SetActive(false);
-        yield return null;
-    }
     //public IEnumerator Act_BigPictureZoom()
     //{
     //    //放大圖片某處，放大位置我會放一個transform，朝著那裏放大就可以了

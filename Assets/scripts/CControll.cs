@@ -75,7 +75,9 @@ public class CControll : MonoBehaviour
     }
     void Start()
     {
-
+        lockX = false;
+        lockY = true;
+        lockZ = true;
     }
 
     void LateUpdate()

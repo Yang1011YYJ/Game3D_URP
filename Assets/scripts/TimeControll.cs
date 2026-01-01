@@ -5,6 +5,7 @@ using UnityEngine;
 public class TimeControll : MonoBehaviour
 {
     [Header("UI")]
+    public GameObject TimeTextImage;
     public TextMeshProUGUI timerText;
     private Coroutine countdownRoutine;
 
@@ -16,11 +17,13 @@ public class TimeControll : MonoBehaviour
     private void Start()
     {
         if (timerText != null) timerText.gameObject.SetActive(false);
+        TimeTextImage.SetActive(false);
     }
 
     public void StartCountdown(int seconds)//¶}©l
     {
         ForceEnd();
+        TimeTextImage.SetActive(true);
         if (timerText != null) timerText.gameObject.SetActive(true);
         countdownRoutine = StartCoroutine(Countdown(seconds));
     }
@@ -30,6 +33,7 @@ public class TimeControll : MonoBehaviour
         if (countdownRoutine != null)
             StopCoroutine(countdownRoutine);
         if (timerText != null) timerText.gameObject.SetActive(false);
+        TimeTextImage.SetActive(false);
         ResetTimer();
     }
 
@@ -66,6 +70,7 @@ public class TimeControll : MonoBehaviour
         if (timerText != null)
             timerText.text = FormatTime(0);
         if (timerText != null) timerText.gameObject.SetActive(false);
+        TimeTextImage.SetActive(false);
         countdownRoutine = null;
     }
 
