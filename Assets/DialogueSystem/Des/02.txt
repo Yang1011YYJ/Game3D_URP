@@ -40,6 +40,8 @@ BusGo
 BlackPanelOn
 1
 LeaveMessageOn
+1
+PlayQuiteMusic
 2
 又來了。這個季節、這個時間。去年也是這樣。
 2

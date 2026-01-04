@@ -1,5 +1,13 @@
 ﻿1
-BusStop(公車停在一片黑暗中)
+WaitforSecond1
+1
+WaitforSecond1
+1
+WaitforSecond1
+1
+BlackPanelOff
+1
+StopInBlack
 2
 [旁白]:「公車還在開著。」
 2

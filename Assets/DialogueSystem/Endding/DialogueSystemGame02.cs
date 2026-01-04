@@ -6,9 +6,9 @@ using UnityEngine.UI;
 
 public class DialogueSystemGame02 : MonoBehaviour
 {
-    [Header("ownerSecond")]
-    public Second ownerSecond; // ✅ 拖 Second 進來
-    public void BindOwner(Second o) => ownerSecond = o;
+    [Header("Fail Scene Owner")]
+    public FailSceneController ownerFail;
+    public void BindFail(FailSceneController f) => ownerFail = f;
 
     [Header("UI")]
     public GameObject TextPanel;
@@ -20,15 +20,14 @@ public class DialogueSystemGame02 : MonoBehaviour
 
     [Header("文本")]
     public TextAsset TextfileCurrent;
-    [Tooltip("遊戲失敗劇情")]public TextAsset TextfileGame03;
-    [Tooltip("遊戲通關劇情")] public TextAsset TextfileGame04;
+    [Tooltip("遊戲失敗劇情")]public TextAsset TextfileGame03_1;
 
     [Header("打字")]
     public float TextSpeed = 0.06f;
 
     [Header("設定")]
     public bool playOnEnable = false;
-    public bool allowFastReveal = true;
+    [Tooltip("允許快速顯示內容")] public bool allowFastReveal = true;
     [Tooltip("允許接收空白鍵")] public bool inputLocked = false;
 
     [Header("自動播放設定")]
@@ -58,12 +57,18 @@ public class DialogueSystemGame02 : MonoBehaviour
 
     private Coroutine typingRoutine;
     private bool isBusy = false;
+    private void Awake()
+    {
+        
+    }
 
     void Start()
     {
         SetPanels(false, false);
+        allowFastReveal = false;
 
-        if (playOnEnable && TextfileCurrent != null)
+        TextfileCurrent = TextfileGame03_1;
+        if (TextfileCurrent != null)
             StartDialogue(TextfileCurrent);
     }
 
@@ -141,6 +146,8 @@ public class DialogueSystemGame02 : MonoBehaviour
 
     private void SetTextUI()
     {
+        Debug.Log($"[Dialogue] index={index}, code={TextList[index].code}, content={TextList[index].content}");
+
         if (index < 0 || index >= TextList.Count) { EndDialogue(); return; }
 
         StopTyping();
@@ -259,56 +266,38 @@ public class DialogueSystemGame02 : MonoBehaviour
         if (actionKey.StartsWith("Label_"))
             yield break;
 
-        if (ownerSecond == null)
+        if (ownerFail == null)
         {
-            Debug.LogWarning("[DialogueSystemGame00] ownerSecond(Second) is null, action ignored: " + actionKey);
+            Debug.LogWarning("[DialogueSystemGame00] ownerFail is null, action ignored: " + actionKey);
             yield break;
         }
 
         // ✅ 只保留 Second 會用到的 Act
         switch (actionKey)
         {
-            case "LightOn":
-                yield return ownerSecond.Act_LightOn();
-                break;
-
-            case "BusLightBright":
-                yield return ownerSecond.Act_BusLightBright();
-                break;
-
-            //case "WalkToFront":
-            //    yield return ownerSecond.Act_WalkToFront();
+            //case "BlackPanelOn":
+            //    yield return ownerFail.Act_BlackPanelOn();
             //    break;
 
-            case "PickPhone":
-                yield return ownerSecond.Act_PickPhone();
-                break;
-
-            case "HangUpPhone":
-                yield return ownerSecond.Act_HangUpPhone();
-                break;
-
-            case "BlackPanelOn":
-                yield return ownerSecond.Act_BlackPanelOn();
-                break;
-
-            case "BlackPanelShutOff":
-                yield return ownerSecond.Act_BlackPanelShutOff();
-                break;
-
             case "BlackPanelOff":
-                yield return ownerSecond.Act_BlackPanelOff();
+                yield return ownerFail.Act_BlackPanelOff();
                 break;
 
-            case "LightDimDown":
-                yield return ownerSecond.Act_LightDimDown();
+            case "WaitforSecond1":
+                if (ownerFail != null) yield return ownerFail.Act_WaitforSecond1();
+                else yield return new WaitForSeconds(1f);
                 break;
 
-            case "SelectRound": 
-                yield return ownerSecond.Act_SelectRound(); 
+            case "StopInBlack":
+                if (ownerFail != null) yield return ownerFail.Act_StopInBlack();
                 break;
 
-            
+            case "ShowWordFail":
+                if (ownerFail != null) yield return ownerFail.Act_ShowWordFail();
+                break;
+
+
+
 
             default:
                 Debug.LogWarning("[DialogueSystemGame00] Unhandled action key: " + actionKey);

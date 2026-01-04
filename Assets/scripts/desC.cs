@@ -9,7 +9,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using static UnityEngine.GraphicsBuffer;
 
-public class desC : MonoBehaviour
+public class desC : MonoBehaviour, ISceneInitializable
 {
     [Header("UI")]
     [Tooltip("顯示訊息")]public GameObject PhoneMessage;
@@ -24,6 +24,7 @@ public class desC : MonoBehaviour
     [Tooltip("說明面板")] public GameObject DesPanel;
     [Tooltip("黑色遮罩")] public GameObject BlackPanel;//
     [Tooltip("顯示地點的文字")] public TextMeshProUGUI PlaceText;
+    public GameObject SettingPanel;
 
     [Header("角色")]
     public GameObject Player;
@@ -37,10 +38,32 @@ public class desC : MonoBehaviour
     [Tooltip("手機鈴聲01")] public GameObject ring01;
     [Tooltip("手機鈴聲02")] public GameObject ring02;
     [Tooltip("外面世界模型")] public GameObject outside;
+    [Tooltip("外面世界地板模型")] public GameObject outsideFloor;
+    [Tooltip("外面世界牆壁模型")] public GameObject outsideWall;
     [Tooltip("車子裡面模型")] public GameObject inside;
+    [Tooltip("車內世界牆壁模型")] public GameObject insideWall;
+    [Header("旋轉參數")]
+    [Tooltip("玩家上車旋轉")] public float targetZ = 9.28f;   // 目標角度
+    [Tooltip("旋轉速度")] public float rotateSpeed = 2f;  // 轉動速度（越大越快）
 
     [Tooltip("玩家進入後的位置")] public Transform InsidePos;
     [Tooltip("玩家座位位置")] public Transform InsideSitPos;
+    public enum SFXType
+    {
+        None,
+        Click,
+        Error,
+        Success,
+        PlayerWalk,
+        NarraTalk,
+        PhoneRing
+    }
+    public enum BGMType
+    {
+        None,
+        Road,
+        Drive
+    }
 
 
     [Header("相機")]
@@ -55,33 +78,119 @@ public class desC : MonoBehaviour
     public DialogueSystemDes dialogueSystemDesScript;
     public FadeInByExposure fader;
     public WorldScroller worldScrollerScript;
+    public AudioSettingsUI audioSettingsUI;
     private void Awake()
     {
         animationScript = GetComponent<AnimationScript>();
-        cControllScript = Player.GetComponent<CControll>();
         sceneChangeScript = FindAnyObjectByType<SceneChange>();
         dialogueSystemDesScript = FindAnyObjectByType<DialogueSystemDes>();
         if (Player != null) cControllScript = FindAnyObjectByType<CControll>();
         if (fader == null) fader = FindAnyObjectByType<FadeInByExposure>();
         if (worldScrollerScript == null) worldScrollerScript = FindAnyObjectByType<WorldScroller>();
-
+        audioSettingsUI = FindAnyObjectByType<AudioSettingsUI>();
     }
     private void Start()
     {
+    }
 
-        PlayerAnimator = cControllScript != null ? cControllScript.animator : null;
+    public List<SceneInitStep> BuildInitSteps()
+    {
+        var steps = new List<SceneInitStep>();
+        const float W = 1f / 7f;
 
-        if (PlayerAnimator == null)
+        steps.Add(new SceneInitStep
         {
-            // 保險：自己找一次
+            label = "取得玩家與動畫控制…",
+            weight = W,
+            action = Step_CacheAnimator
+        });
+
+        steps.Add(new SceneInitStep
+        {
+            label = "初始化 燈光 狀態…",
+            weight = W,
+            action = Step_InitFader
+        });
+
+        steps.Add(new SceneInitStep
+        {
+            label = "初始化 音效 狀態…",
+            weight = W,
+            action = Step_InitVoice
+        });
+
+        steps.Add(new SceneInitStep
+        {
+            label = "初始化 UI 狀態…",
+            weight = W,
+            action = Step_InitUI
+        });
+
+        steps.Add(new SceneInitStep
+        {
+            label = "初始化場景狀態…",
+            weight = W,
+            action = Step_InitWorld
+        });
+
+        steps.Add(new SceneInitStep
+        {
+            label = "初始化對話狀態…",
+            weight = W,
+            action = Step_InitDialogue
+        });
+
+        steps.Add(new SceneInitStep
+        {
+            label = "載入劇情…",
+            weight = W,
+            action = Step_StartDialogue
+        });
+
+        return steps;
+    }
+
+    private IEnumerator Step_CacheAnimator()
+    {
+        PlayerAnimator = cControllScript ? cControllScript.animator : null;
+
+        if (!PlayerAnimator && PlayerWithAnim)
             PlayerAnimator = PlayerWithAnim.GetComponentInChildren<Animator>();
-        }
 
-        if (PlayerAnimator == null)
-        {
+        if (!PlayerAnimator)
             Debug.LogError("[desC] 找不到 Player 的 Animator，請檢查 Player 階層。", this);
-        }
-        // 初始 UI
+
+        yield return null; // 讓一步至少佔一幀，loading 看起來更穩
+    }
+
+    private IEnumerator Step_InitFader()
+    {
+        fader.Cache();
+
+        yield return null;
+    }
+
+    public IEnumerator Step_InitVoice()
+    {
+        // 讀取存檔的音量（沒有就用 Slider 目前值）
+        float music = PlayerPrefs.GetFloat(AudioSettingsUI.MUSIC_PARAM, audioSettingsUI.musicSlider.value);
+        float sfx = PlayerPrefs.GetFloat(AudioSettingsUI.SFX_PARAM, audioSettingsUI.sfxSlider.value);
+
+        audioSettingsUI.musicSlider.value = music;
+        audioSettingsUI.sfxSlider.value = sfx;
+
+        audioSettingsUI.ApplyMusic(music);
+        audioSettingsUI.ApplySFX(sfx);
+
+        // 綁定事件
+        audioSettingsUI.musicSlider.onValueChanged.AddListener(audioSettingsUI.ApplyMusic);
+        audioSettingsUI.sfxSlider.onValueChanged.AddListener(audioSettingsUI.ApplySFX);
+
+        yield return null;
+    }
+
+    private IEnumerator Step_InitUI()
+    {
         if (BlackPanel) BlackPanel.SetActive(false);
         if (PhoneMessage) PhoneMessage.SetActive(false);
         if (CloseButton) CloseButton.SetActive(false);
@@ -89,17 +198,112 @@ public class desC : MonoBehaviour
         if (PlaceText) PlaceText.gameObject.SetActive(false);
         if (ring01) ring01.SetActive(false);
         if (ring02) ring02.SetActive(false);
+        if (SettingPanel) SettingPanel.SetActive(false);
+        if (Bus) Bus.SetActive(false);
 
-        if (Bus) Bus.SetActive(false); // ✅ 等車階段不顯示
+        yield return null;
+    }
 
-        // 直接開始跑劇本（你把完整劇本 TextAsset 拖給 DialogueSystemDes）
+    private IEnumerator Step_InitWorld()
+    {
+        if (worldScrollerScript) worldScrollerScript.BusMove = false;
+
+        Player.transform.position = playerStartPos.position;
+        yield return null;
+    }
+
+    private IEnumerator Step_InitDialogue()
+    {
+        dialogueSystemDesScript.SetPanels(false, false);
+        dialogueSystemDesScript.allowFastReveal = false;
+        yield return null;
+    }
+    
+
+    private IEnumerator Step_StartDialogue()
+    {
         if (dialogueSystemDesScript != null)
         {
             dialogueSystemDesScript.BindOwner(this);
-            dialogueSystemDesScript.autoNextLine = false; // 你這段劇情比較像自動播放
+            dialogueSystemDesScript.autoNextLine = false;
             dialogueSystemDesScript.StartDialogue(dialogueSystemDesScript.Textfile01);
         }
+        yield return null;
     }
+
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            Debug.Log("1");
+            SettingPanel.SetActive(!SettingPanel.activeSelf);
+        }
+    }
+
+    public void FastOK()//快速通過劇情
+    {
+        dialogueSystemDesScript.allowFastReveal = !dialogueSystemDesScript.allowFastReveal;
+        Debug.Log(dialogueSystemDesScript.allowFastReveal.ToString());
+    }
+
+    public IEnumerator PlayReverse(string stateName, float duration)//倒著播放動畫
+    {
+        Animator anim = cControllScript.animator;
+
+        float t = 1f;
+        while (t > 0f)
+        {
+            anim.Play(stateName, 0, t);
+            t -= Time.deltaTime / duration;
+            yield return null;
+        }
+
+        anim.Play(stateName, 0, 0f);
+    }
+
+    public void BackToMenu()
+    {
+        BlackPanel.SetActive(true);
+        animationScript.Fade(
+            BlackPanel,
+            1.5f,
+            0f,
+            1f,
+            () => LoadingManager.Instance.BeginLoad("menu")
+        );
+        //BlackPanel.SetActive(false );
+    }
+
+    private IEnumerator FakeEnterBus(Transform player, float dur = 0.25f)
+    {
+        var sr = player.GetComponent<SpriteRenderer>();
+        Vector3 startPos = player.position;
+        Vector3 endPos = startPos + new Vector3(0.15f, -0.1f, 0f); // 依鏡頭方向調
+        Vector3 startScale = player.localScale;
+        Vector3 endScale = startScale * 0.9f;
+
+        float startA = sr ? sr.color.a : 1f;
+        float endA = 0.2f;
+
+        float t = 0f;
+        while (t < dur)
+        {
+            t += Time.deltaTime;
+            float k = Mathf.Clamp01(t / dur);
+
+            player.position = Vector3.Lerp(startPos, endPos, k);
+            player.localScale = Vector3.Lerp(startScale, endScale, k);
+
+            if (sr)
+            {
+                var c = sr.color;
+                c.a = Mathf.Lerp(startA, endA, k);
+                sr.color = c;
+            }
+            yield return null;
+        }
+    }
+
     //public void StartButton()
     //{
     //    animationScript.Fade(BlackPanel, 1.5f, "01"));
@@ -124,8 +328,10 @@ public class desC : MonoBehaviour
         if (PhoneMessage) PhoneMessage.SetActive(false);
         if (CloseButton) CloseButton.SetActive(false);
 
-        if (PlayerAnimator != null)
-            PlayerAnimator.SetBool("phone", false);
+        StartCoroutine(PlayReverse("phone", 2f));//倒著播放動畫
+        yield return new WaitForSeconds(2.5f);
+        if (cControllScript.animator != null)
+            cControllScript.animator.SetBool("phone", false);
 
         yield return new WaitForSeconds(1f);
     }
@@ -134,6 +340,7 @@ public class desC : MonoBehaviour
     {
         if (ring01) ring01.SetActive(false);
         if (ring02) ring02.SetActive(false);
+        audioSettingsUI.StopLoopSFX();
 
         var a1 = ring01 ? ring01.GetComponent<Animator>() : null;
         var a2 = ring02 ? ring02.GetComponent<Animator>() : null;
@@ -158,6 +365,7 @@ public class desC : MonoBehaviour
 
         cControllScript.Target3D = middlePoint.position;
         cControllScript.StartAutoMoveTo(cControllScript.Target3D);
+        audioSettingsUI.PlaySFX(SFXType.PlayerWalk);
         yield return new WaitUntil(() => cControllScript.autoMoveFinished);
     }
 
@@ -169,8 +377,14 @@ public class desC : MonoBehaviour
         cControllScript.autoMoveFinished = false;
         cControllScript.animator.SetBool("walk", true);
         cControllScript.isAutoMoving = true;
+        audioSettingsUI.PlaySFX(SFXType.PlayerWalk);
 
         yield return new WaitUntil(() => cControllScript.autoMoveFinished);
+
+        audioSettingsUI.StopLoopSFX();
+        cControllScript.animator.SetBool("turn", true);
+        yield return new WaitForSeconds(1.1f);
+        Player.SetActive(false);
 
         // 🔒 關閉玩家控制，避免上車後亂動
         cControllScript.playerControlEnabled = false;
@@ -178,13 +392,14 @@ public class desC : MonoBehaviour
         // ✅ 重點：把玩家設成車的子物件
         Player.transform.SetParent(Bus.transform, true);
 
-        cControllScript.animator.SetBool("walk", false);
+        cControllScript.animator.SetBool("turn", false);
     }
 
     public IEnumerator Act_PhoneRing()
     {
         if (ring01) ring01.SetActive(true);
         if (ring02) ring02.SetActive(true);
+        audioSettingsUI.PlayLoopSFX(SFXType.PhoneRing);
 
         var a1 = ring01 ? ring01.GetComponent<Animator>() : null;
         var a2 = ring02 ? ring02.GetComponent<Animator>() : null;
@@ -236,7 +451,7 @@ public class desC : MonoBehaviour
     public IEnumerator Act_NextScene(string sceneName)
     {
         yield return new WaitForSeconds(2f);
-        sceneChangeScript.SceneC("01");
+        LoadingManager.Instance.BeginLoad("01");
     }
 
 
@@ -292,7 +507,10 @@ public class desC : MonoBehaviour
     public IEnumerator Act_Inside()
     {
         if (outside) outside.SetActive(false);
+        if (outsideFloor) outsideFloor.SetActive(false);
+        if (outsideWall) outsideWall.SetActive(false);
         if (inside) inside.SetActive(true);
+        if (insideWall) insideWall.SetActive(true);
 
         // 把玩家移到室內位置（兩種做法你選一個）
 
@@ -300,6 +518,9 @@ public class desC : MonoBehaviour
         if (InsidePos != null && cControllScript != null)
         {
             Player.transform.position = InsidePos.position;
+
+            cControllScript.animator.SetBool("turn", false);
+            Player.SetActive(true);
         }
         else if (InsidePos != null)
         {
@@ -329,6 +550,13 @@ public class desC : MonoBehaviour
         yield return new WaitForSeconds(cControllScript.sitsleep.length);
 
         yield return new WaitForSeconds(1);
+    }
+
+    public IEnumerator Act_PlayQuiteMusic()
+    {
+        audioSettingsUI.StopBGMLoop();
+        audioSettingsUI.PlayDrive();
+        yield return null;
     }
 
 }

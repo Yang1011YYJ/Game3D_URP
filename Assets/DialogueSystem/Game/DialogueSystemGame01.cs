@@ -62,7 +62,7 @@ public class DialogueSystemGame01 : MonoBehaviour
     [Tooltip("標記是否正在打字")] public bool isTyping = false;
 
     private Coroutine typingRoutine;
-    private bool isBusy = false;// 執行動作/等待中，先鎖住輸入
+    public bool isBusy = false;// 執行動作/等待中，先鎖住輸入
 
     [Header("腳本")]
     public CControll cControllScript;
@@ -86,17 +86,16 @@ public class DialogueSystemGame01 : MonoBehaviour
 
     void Update()
     {
-        if (isBusy) return;
-        if (!anyPanelOn()) return;// 如果任何面板開著，才接受空白鍵跳過或下一行
+        if (isBusy)
+        {
+            return;
+        }
+        if (!anyPanelOn() && !keepTalk) return;// 如果任何面板開著，才接受空白鍵跳過或下一行
 
         if (keepTalk)
         {
             keepTalk = false; // 避免重複觸發
-            if (nextDialogue != null)
-            {
-                StartDialogue(nextDialogue);
-                nextDialogue = null;
-            }
+            StartDialogue(TextfileCurrent);
             return;
         }
 
@@ -126,6 +125,7 @@ public class DialogueSystemGame01 : MonoBehaviour
             Debug.LogWarning("[DialogueSystemGame00] textAsset is null");
             return;
         }
+        inputLocked = false;
 
         TextfileCurrent = textAsset;
         ParseFileToEntries(TextfileCurrent);
@@ -404,10 +404,8 @@ public class DialogueSystemGame01 : MonoBehaviour
                 yield return ownerSecond.Act_BlackPanelOff();
                 break;
 
-            case "waitforSecs":
-                // 從 actionText 抓第一個數字，抓不到就預設 2 秒
-                float sec = ExtractFirstNumber(key, 2f);
-                yield return new WaitForSeconds(sec);
+            case "WaitForSecond1":
+                yield return ownerSecond.Act_WaitForSecondsCoroutine(2.0f); // 或直接寫在 Second 裡
                 break;
 
             case "CameraBack":
@@ -511,6 +509,9 @@ public class DialogueSystemGame01 : MonoBehaviour
 
     private bool anyPanelOn()
     {
+        //Debug.Log("anyPanelOn");
+        //if(TextPanel.activeSelf) Debug.Log(TextPanel.activeSelf);
+        //if (NarraTextPanel.activeSelf) Debug.Log(NarraTextPanel.activeSelf);
         return (TextPanel && TextPanel.activeSelf) || (NarraTextPanel && NarraTextPanel.activeSelf);
     }
 

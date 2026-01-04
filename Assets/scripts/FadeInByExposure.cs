@@ -10,10 +10,10 @@ public class FadeInByExposure : MonoBehaviour
 
     void Awake()
     {
-        Cache();
+        
     }
 
-    private void Cache()
+    public void Cache()
     {
         if (volume == null) { Debug.LogError("[FadeInByExposure] volume is null"); return; }
         if (volume.profile == null) { Debug.LogError("[FadeInByExposure] volume.profile is null"); return; }

@@ -295,7 +295,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 197.32, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &101028332
@@ -1401,8 +1401,8 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 1323788854089962556}
   - {fileID: 1312221055}
+  - {fileID: 1323788854089962556}
   - {fileID: 1065118670}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -1422,6 +1422,8 @@ MonoBehaviour:
   BusMove: 0
   moveMode: 0
   moveSpeed: 5
+  autoStartMove: 1
+  autoStartSpeed: 5
   StopTarget: {fileID: 0}
   GoTarget: {fileID: 0}
   targetEpsilon: 0.02
@@ -4262,7 +4264,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dd649a9c7f46a08499fcfeffb34e5ad6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  Player: {fileID: 0}
+  target: {fileID: 0}
+  LeftestCameraPosition: -6.09
+  RightestCameraPosition: 5.85
+  isAutoMovingCamera: 0
   cam: {fileID: 1132088514}
+  camF: {fileID: 0}
 --- !u!4 &1132088517 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 0c41ac7ece0ac6847a1c0b51bbd74773,
@@ -5624,7 +5632,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 197.32, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1560370887
@@ -5930,6 +5938,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7101ac2b9d9de704987b22184003b921, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  TimeTextImage: {fileID: 0}
   timerText: {fileID: 1490631476}
   isRunning: 0
   currentTime: 0
@@ -5954,6 +5963,7 @@ MonoBehaviour:
   roundRunning: 0
   spotFoundThisRound: 0
   consecutiveFailedRounds: 0
+  roundResolved: 0
 --- !u!114 &1577382534
 MonoBehaviour:
   m_ObjectHideFlags: 0

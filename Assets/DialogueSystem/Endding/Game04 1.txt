@@ -1,4 +1,12 @@
-﻿2
+﻿1
+WaitforSecond1
+1
+WaitforSecond1
+1
+WaitforSecond1
+1
+BlackPanelOff
+2
 [旁白]:「剛剛那些...是真的還是夢,他也說不清了。」
 2
 [旁白]:「但想想...好像也沒那麼重要。」

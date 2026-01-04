@@ -4,3 +4,8 @@ V1
 1:1,Assembly-CSharp,,q_,p_
 2:Act_showPlace,n
 2:StartTeachingRound,W
+2:Step_InitVoice,Q
+2:music,pW
+2:sfx,o
+2:TickMove,P
+2:target,G

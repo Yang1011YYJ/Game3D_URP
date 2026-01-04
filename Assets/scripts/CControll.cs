@@ -40,6 +40,9 @@ public class CControll : MonoBehaviour
     [Tooltip("自動移動是否結束（給外部查詢用）")]public bool autoMoveFinished = false;
     float x; // 最後實際拿去移動用的輸入值
 
+
+    Coroutine rotateRoutine;
+
     [Header("腳本")]
     public First firstScript;
 
@@ -205,6 +208,38 @@ public class CControll : MonoBehaviour
         
     }
 
+    /// <summary>
+    /// 觸發旋轉到指定 Z 角度
+    /// </summary>
+    public void RotateToZ(float targetZ, float duration = 1.5f)
+    {
+        if (rotateRoutine != null)
+            StopCoroutine(rotateRoutine);
+
+        rotateRoutine = StartCoroutine(RotateToZCoroutine(targetZ, duration));
+    }
+
+    IEnumerator RotateToZCoroutine(float targetZ, float duration)
+    {
+        Quaternion start = transform.rotation;
+        Quaternion end = Quaternion.Euler(
+            transform.eulerAngles.x,
+            transform.eulerAngles.y,
+            targetZ
+        );
+
+        float t = 0f;
+
+        while (t < 1f)
+        {
+            t += Time.deltaTime / duration;
+            transform.rotation = Quaternion.Lerp(start, end, t);
+            yield return null;
+        }
+
+        transform.rotation = end; // 保證停在精準角度
+        rotateRoutine = null;
+    }
 
     /// 給外部呼叫，開始自動走到某個 X 位置
     public void StartAutoMoveTo(Vector3 Target)

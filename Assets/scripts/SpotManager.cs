@@ -26,6 +26,8 @@ public class SpotManager : MonoBehaviour
     [SerializeField] private bool spotFoundThisRound = false;
     [Header("Runtime (Read Only)")]
     [SerializeField] public int consecutiveFailedRounds = 0; // ✅連續失敗回合數
+    [Tooltip("回合是否已結算")][SerializeField] private bool roundResolved = false;
+
     public bool IsConsecutiveFailGameOver(int failLimit = 2) => consecutiveFailedRounds >= failLimit;
 
 
@@ -53,6 +55,7 @@ public class SpotManager : MonoBehaviour
 
         roundIndex++;
         spotFoundThisRound = false;
+        roundResolved = false;   // ⭐重點
         roundRunning = true;
 
         OnRoundBegan?.Invoke(roundIndex);
@@ -66,6 +69,7 @@ public class SpotManager : MonoBehaviour
         if (IsGameEnded()) return;
         if (spotFoundThisRound) return;
         roundRunning = true;
+        roundResolved = false;
     }
 
     public void PauseRound()
@@ -94,6 +98,9 @@ public class SpotManager : MonoBehaviour
     {
         if (!roundRunning) return;
         if (spotFoundThisRound) return;
+        if (roundResolved) return;   // ⭐
+
+        roundResolved = true;        // ⭐先鎖
 
         spotFoundThisRound = true;
         roundRunning = false;
@@ -125,6 +132,9 @@ public class SpotManager : MonoBehaviour
     {
         if (!roundRunning) return;
         if (spotFoundThisRound) return;
+        if (roundResolved) return;   // ⭐
+
+        roundResolved = true;        // ⭐
 
         ApplyFailAction(); // ✅ 點錯就是一次失敗行為
     }
@@ -134,6 +144,9 @@ public class SpotManager : MonoBehaviour
     {
         if (!roundRunning) return;
         if (spotFoundThisRound) return;
+        if (roundResolved) return;   // ⭐
+
+        //roundResolved = true;        // ⭐
 
         ApplyFailAction(); // ✅ 超時就是一次失敗行為
     }
@@ -142,19 +155,29 @@ public class SpotManager : MonoBehaviour
     private void ApplyFailAction()
     {
         livesLeft--;
-        OnLivesChanged?.Invoke(livesLeft);
-
-        if (livesLeft > 0)
-        {
-            // ✅ 還有命：回合不中斷，繼續讓玩家玩（是否重計時由 Second 決定）
-            // SpotManager 不碰 timer
-            return;
-        }
-
-        // ✅ 沒命：立刻遊戲結束（用 RoundEnded 通知 Second 去跳 fail 場景）
+        // 發生失誤，立即停止回合運行，防止重複點擊
         roundRunning = false;
+        roundResolved = true; // 先鎖住，直到 Second.cs 決定下一步
+        OnLivesChanged?.Invoke(livesLeft);
+    }
+
+    // 新增一個方法供 Second.cs 在「再試一次」時呼叫
+    public void ReadyToRetry()
+    {
+        roundResolved = false; // 演出完畢，正式解鎖「可點擊」狀態
+        roundRunning = true;   // 開啟計時與點擊
+    }
+
+    public void ForceRoundEnd()
+    {
+        //if (roundResolved) return;
+
+        roundResolved = true;
+        roundRunning = false;
+
         OnRoundEnded?.Invoke(roundIndex, totalFound, RoundEndType.FailedRound);
     }
+
 
     // 狀態查詢
     public bool IsWin() => totalFound >= needFoundToWin;

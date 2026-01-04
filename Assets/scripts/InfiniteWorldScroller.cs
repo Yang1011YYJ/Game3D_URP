@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class WorldScroller : MonoBehaviour
@@ -18,6 +19,9 @@ public class WorldScroller : MonoBehaviour
 
     [Tooltip("世界往右移動的速度（+X）")]
     public float moveSpeed = 5f;
+
+    public bool autoStartMove = true;
+    public float autoStartSpeed = 5f;
 
     [Tooltip("玩家上車前移動的目標")] public Transform StopTarget;
     [Tooltip("玩家上車後移動的目標")]public Transform GoTarget;
@@ -49,6 +53,8 @@ public class WorldScroller : MonoBehaviour
     // ---- internal ----
     float segmentWidth = 0f;
 
+    public Coroutine stopRoutine;
+
     void Awake()
     {
         if (targetCamera == null) targetCamera = Camera.main;
@@ -57,8 +63,7 @@ public class WorldScroller : MonoBehaviour
 
     void Start()
     {
-        // 自動抓 segment 寬度（不用你知道地板多寬）
-        ResolveSegmentWidth();
+        
     }
 
     void Update()
@@ -69,6 +74,8 @@ public class WorldScroller : MonoBehaviour
 
         // 2) 無限場景維護（生成/移除）
         TickInfiniteSegments();
+
+        if (targetCamera == null) targetCamera = Camera.main;
     }
 
     // =========================
@@ -134,10 +141,46 @@ public class WorldScroller : MonoBehaviour
         BusMove = false;
     }
 
+    public IEnumerator StopInBlack(float duration)
+    {
+        // 沒在移動就當作完成
+        if (!BusMove) yield break;
+
+        // 如果之前有停車協程在跑，先停掉
+        if (stopRoutine != null)
+        {
+            StopCoroutine(stopRoutine);
+            stopRoutine = null;
+        }
+
+        // 確保目前是 Speed 模式 + 正在動
+        moveMode = MoveMode.Speed;
+        BusMove = true;
+
+        float startSpeed = moveSpeed;
+        float t = 0f;
+
+        // 保證是 Speed 模式才有「慢慢停」的感覺
+
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            float k = Mathf.Clamp01(t / duration);
+
+            // 速度慢慢歸零
+            moveSpeed = Mathf.Lerp(startSpeed, 0f, k);
+
+            yield return null;
+        }
+
+        moveSpeed = 0f;
+        StopMove(); // BusMove=false
+    }
+
     // =========================
     // 無限場景（生成 / 刪除）
     // =========================
-    void TickInfiniteSegments()
+    public void TickInfiniteSegments()
     {
         if (segmentPrefab == null) return;
         if (segments == null || segments.Count == 0) return;
@@ -155,35 +198,47 @@ public class WorldScroller : MonoBehaviour
             SpawnToLeftOf(segments[0]);
         }
     }
-    bool ShouldDespawnRight(Transform seg)
+    public bool ShouldDespawnRight(Transform seg)
     {
         return GetBounds(seg).min.x > despawnWorldX;
     }
 
-    void SpawnToLeftOf(Transform baseSeg)
+    public void SpawnToLeftOf(Transform baseSeg)
     {
         GameObject go = Instantiate(segmentPrefab);
         Transform t = go.transform;
-        t.SetParent(worldRoot, true);
 
-        Bounds baseB = GetBounds(baseSeg);
-        Bounds newB = GetBounds(t);
+        t.SetParent(worldRoot, false);
+        t.rotation = baseSeg.rotation;                 // 用世界旋轉對齊
+        t.localScale = baseSeg.localScale;             // 用 localScale 對齊（同 parent 時最合理）
 
-        // 讓 newSeg 的 max.x 貼到 baseSeg 的 min.x
-        float dx = baseB.min.x - newB.max.x;
 
-        // y/z 對齊
-        float dy = baseSeg.position.y - t.position.y;
-        float dz = baseSeg.position.z - t.position.z;
+        //Bounds baseB = GetBounds(baseSeg);
+        //Bounds newB = GetBounds(t);
 
-        t.position += new Vector3(dx, dy, dz);
+        //// 讓 newSeg 的 max.x 貼到 baseSeg 的 min.x
+        //float dx = baseB.min.x - newB.max.x;
+
+        //// y/z 對齊
+        //float dy = baseSeg.position.y - t.position.y;
+        //float dz = baseSeg.position.z - t.position.z;
+
+        //t.position += new Vector3(dx, dy, dz);
+
+        // ✅ 用 segmentWidth 往左擺（用 localPosition 更穩）
+        t.localPosition = baseSeg.localPosition + Vector3.left * segmentWidth;
+
 
         // 因為是最左邊補，所以插到 List 的最前面
         segments.Insert(0, t);
+
+        Debug.Log($"baseRot={baseSeg.rotation.eulerAngles} newRot={t.rotation.eulerAngles} worldRot={worldRoot.rotation.eulerAngles}");
+        Debug.Log($"baseScale={baseSeg.lossyScale} newScale={t.lossyScale} worldScale={worldRoot.lossyScale}");
+
     }
 
 
-    void DespawnRightMost()
+    public void DespawnRightMost()
     {
         if (segments.Count <= 1) return;
 
@@ -197,7 +252,7 @@ public class WorldScroller : MonoBehaviour
     // =========================
     // 工具：自動算寬 / bounds
     // =========================
-    void ResolveSegmentWidth()
+    public void ResolveSegmentWidth()
     {
         if (segments == null || segments.Count == 0)
         {
@@ -214,7 +269,7 @@ public class WorldScroller : MonoBehaviour
             segmentWidth = GetPrefabWidth(segmentPrefab);
     }
 
-    Bounds GetBounds(Transform t)
+    public Bounds GetBounds(Transform t)
     {
         Renderer[] rs = t.GetComponentsInChildren<Renderer>();
         if (rs.Length == 0) return new Bounds(t.position, Vector3.one);
@@ -226,7 +281,7 @@ public class WorldScroller : MonoBehaviour
         return b;
     }
 
-    float GetPrefabWidth(GameObject prefab)
+    public float GetPrefabWidth(GameObject prefab)
     {
         // 暫時生成到場景外算 bounds 寬度，再刪掉
         GameObject tmp = Instantiate(prefab);

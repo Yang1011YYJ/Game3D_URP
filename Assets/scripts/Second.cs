@@ -52,7 +52,7 @@ public class Second : MonoBehaviour
 
 
     [Header("其他UI")]
-    public GameObject PhonePanel;
+    //public GameObject PhonePanel;
     [Tooltip("玩家對話框還看的到")] public GameObject BlackPanel;
     [Tooltip("玩家對話框看不到")] public GameObject BlackPanel22;
     [Tooltip("遊戲名字")] public GameObject GameName;
@@ -94,6 +94,8 @@ public class Second : MonoBehaviour
     private Coroutine _mistakeRoutine;
     private int _prevLives = -1;
     private bool _gameStarted = false;
+    private bool _endedByTimeout = false;
+
 
     [Header("相機相關")]
     [Tooltip("Focal length")] public float targetFocal;
@@ -188,8 +190,8 @@ public class Second : MonoBehaviour
         ErrorPanel.SetActive(true);
         animationScript.Fade(ErrorPanel, 1, 0, 1, null);
         PhotoFrameImage.gameObject.SetActive(true);
-        PhonePanel.gameObject.SetActive(false);
-        yield return new WaitForSeconds(1.5f);
+        //PhonePanel.gameObject.SetActive(false);
+        //yield return new WaitForSeconds(1.5f);
 
         // ✅（重點）鎖對話系統輸入，避免空白鍵亂跳
         dialogueSystemGame01Script.inputLocked = true; // 開始
@@ -231,6 +233,11 @@ public class Second : MonoBehaviour
     public void OnBackgroundClicked()
     {
         if (currentPhase != GamePhase.Playing) return;
+        if (timer != null)
+        {
+            timer.onTimeUp = null;
+            timer.ForceEnd();
+        }
         spotManager.OnBackgroundClicked();
     }
 
@@ -245,6 +252,19 @@ public class Second : MonoBehaviour
         HintText.gameObject.SetActive(true);
         HintText.gameObject.GetComponent<CanvasGroup>().alpha = 1;
         HintText.text = "請在15秒內點擊異常!";
+
+        // 4) 開啟這一題的 spot
+        if (currentDef.spotRoot != null) currentDef.spotRoot.SetActive(true);
+
+            
+
+        // 5) 把題目圖片換到 ErrorPanel 上
+        if (currentDef.questionImage != null)
+        {
+            animationScript.Fade(currentDef.questionImage.gameObject, 1, 0, 1, null);
+            currentDef.questionImage.gameObject.SetActive(true);
+        }
+
         OpenErrorPanel();     // ✅ 保證 ErrorPanel 會亮
         animationScript.Fade(ErrorPanel,1, 0, 1, null);
         yield return new WaitForSeconds(1.5f);
@@ -297,21 +317,21 @@ public class Second : MonoBehaviour
                 spotPool[i].spotRoot.SetActive(false);
         }
 
-        // 4) 開啟這一題的 spot
-        if (currentDef.spotRoot != null)
-            currentDef.spotRoot.SetActive(true);
+        //// 4) 開啟這一題的 spot
+        //if (currentDef.spotRoot != null)
+        //    currentDef.spotRoot.SetActive(true);
 
-        // 5) 把題目圖片換到 ErrorPanel 上
-        if (currentDef.questionImage != null)
-            currentDef.questionImage.gameObject.SetActive(true);
+        //// 5) 把題目圖片換到 ErrorPanel 上
+        //if (currentDef.questionImage != null)
+        //    currentDef.questionImage.gameObject.SetActive(true);
 
-        // 6) （可選）清理 UI 或提示文字
-        if (HintText != null)
-        {
-            HintText.gameObject.SetActive(true);
-            HintText.gameObject.GetComponent<CanvasGroup>().alpha = 1;
-            HintText.text = "在時間內找出異常！";
-        }
+        //// 6) （可選）清理 UI 或提示文字
+        //if (HintText != null)
+        //{
+        //    HintText.gameObject.SetActive(true);
+        //    HintText.gameObject.GetComponent<CanvasGroup>().alpha = 1;
+        //    HintText.text = "在時間內找出異常！";
+        //}
         selectFinish = true;
         hasSelectedRound = true;
 
@@ -408,7 +428,7 @@ public class Second : MonoBehaviour
         _prevLives = livesLeft;
 
         // lives==0 的死亡演出交給 RoundEnded(FailedRound)
-        if (livesLeft <= 0) return;
+        //if (livesLeft <= 0) return;
 
         // ✅ 每次扣命都要：jumpscare + 重計時（如果還活著）
         StartCoroutine(LifeLostFlow(livesLeft));
@@ -424,6 +444,7 @@ public class Second : MonoBehaviour
 
     private IEnumerator RoundEndFlow(RoundEndType endType)//回合結束的流程
     {
+        _roundFlowDone = false;
         // 0) 保險：停止互動、停止倒數
         spotManager.PauseRound();
         if (timer != null)
@@ -432,28 +453,30 @@ public class Second : MonoBehaviour
             timer.ForceEnd();
         }
 
-        // 1️⃣ 播成功 / 失敗演出
+        // 1. 成功時的特別演出 (閃光、文字)
         if (endType == RoundEndType.FoundSpot)
         {
             yield return StartCoroutine(HandleSuccess());
         }
         else
         {
-            yield return StartCoroutine(HandleFailure());
+            // 失敗時，LifeLostFlow 已經播過 Jumpscare 了，這裡只需做最後的清理
+            yield return new WaitForSeconds(1f);
         }
-
+        Debug.Log("111111");
+        // ⭐ 用完一定要重置，不然下一回合會殘留
+        _endedByTimeout = false;
 
         // 2️⃣ 回合 UI 清乾淨（畫面回到正常狀態）
         CleanupRoundUI();
 
-        // 3 先確保畫面回到遊戲場景（淡出黑幕）
-        yield return StartCoroutine(Act_BlackPanelOff());
-
-        // ⭐ 回合間的呼吸時間（你要的 5 秒）
-        yield return new WaitForSeconds(5f);
+        //// ⭐ 回合間的呼吸時間（你要的 5 秒）
+        //Debug.Log("回合結束，等待 5 秒呼吸時間...");
+        //yield return new WaitForSeconds(5f);
 
         // 4️⃣ 現在才判斷最終結局
         CheckFinalResultOrContinue();
+        _roundFlowDone = true;
 
         //// ✅ FailedRound：跑「死亡演出」再跳 fail
         //yield return StartCoroutine(DeathEndFlow());
@@ -462,6 +485,15 @@ public class Second : MonoBehaviour
 
     private void CheckFinalResultOrContinue()//判斷是通關還是失敗
     {
+        // 取得當前狀態以便偵錯
+        int found = spotManager.totalFound;
+        int target = spotManager.needFoundToWin;
+        int currentRound = spotManager.roundIndex;
+        int maxRounds = spotManager.totalRounds;
+        int lives = spotManager.livesLeft;
+
+        Debug.Log($"[結算檢查] 進度：{found}/{target} | 生命：{lives} | 回合：{currentRound}/{maxRounds}");
+
         if (spotManager.IsWin())
         {
             Debug.Log("[Second] GAME WIN → play ending story");
@@ -475,7 +507,7 @@ public class Second : MonoBehaviour
             return;
         }
 
-        else if (spotManager.IsGameEnded())
+        else if (lives <= 0 || currentRound >= maxRounds)
         {
             Debug.Log("[Second] GAME OVER → play fail story");
             currentPhase = GamePhase.End;
@@ -484,7 +516,9 @@ public class Second : MonoBehaviour
 
             // 播放失敗劇情
             dialogueSystemGame01Script.keepTalk = true;
+            dialogueSystemGame01Script.TextfileCurrent = dialogueSystemGame01Script.TextfileGame03;
             dialogueSystemGame01Script.nextDialogue = dialogueSystemGame01Script.TextfileGame03;
+            dialogueSystemGame01Script.isBusy = false;
             return;
         }
         else
@@ -492,7 +526,15 @@ public class Second : MonoBehaviour
             // ⭐ 關鍵補齊點
             Debug.Log("[Second] Continue to next round");
 
+            //if (_roundFinished == false || _roundFlowDone == false)
+            //{
+            //    Debug.Log(_roundFinished);
+            //    Debug.Log(_roundFlowDone);
+            //    return;
+            //}
+            //if (dialogueSystemGame01Script != null && dialogueSystemGame01Script.isBusy) return;
             StartCoroutine(SelectAndStartRoutine());
+
         }
     }
 
@@ -539,7 +581,11 @@ public class Second : MonoBehaviour
     private void HandleRoundBegan(int roundIndex)
     {
         // 每回合開始：開 timer
-        timer.onTimeUp = () => spotManager.OnTimeout();
+        timer.onTimeUp = () =>
+        {
+            _endedByTimeout = true;
+            spotManager.OnTimeout();
+        };
         timer.StartCountdown(roundSeconds);
     }
 
@@ -549,35 +595,52 @@ public class Second : MonoBehaviour
         // ✅ 先暫停，避免玩家在 jumpscare 期間又扣第二次
         spotManager.PauseRound();
 
-        
+        // 1. 不論是第幾次失敗，一律先播 Jumpscare
+        yield return StartCoroutine(HandleFailure());
 
         // 2) 提示文字
         if (HintText != null)
         {
             HintText.gameObject.SetActive(true);
-            HintText.text = $"這裡沒有異常！剩餘機會：{livesLeft}";
-        }
-        // 1) jumpscare
-        yield return StartCoroutine(HandleFailure());
-        yield return new WaitForSeconds(1.5f);
+            HintText.alpha = 1;
 
-        // 3) 如果還有命 → 重計時繼續同一回合
+            HintText.text = _endedByTimeout ? $"……太慢了！剩餘機會：{livesLeft}"
+                                            : $"這裡沒有異常！剩餘機會：{livesLeft}";
+
+
+        }
+        
+        yield return new WaitForSeconds(2f);// 讓玩家看清楚文字
+
+        // 3. 根據生命值判斷後續行為
         if (livesLeft > 0)
         {
+            // --- 還有生命：回合繼續 ---
             RedPanel.gameObject.SetActive(false);
             HintText.gameObject.SetActive(false);
 
             timer.ForceEnd();
-            timer.StartCountdown(roundSeconds);
+            timer.StartCountdown(roundSeconds);// 重新計時
 
             yield return new WaitForSeconds(0.2f);
             HintText.gameObject.SetActive(true);
+            HintText.alpha = 1;
             HintText.text = "再試一次!";
 
-            spotManager.ResumeRound();
+
+            spotManager.ResumeRound();// 回到可點擊狀態
             yield break;
         }
+        else
+        {
+            // --- 沒有生命了：正式結束回合 ---
+            Debug.Log("生命耗盡，準備結束回合");
+            spotManager.ForceRoundEnd();
+        }
 
+
+        // ⭐ 用完一定要重置，不然下一回合會殘留
+        _endedByTimeout = false;
         // livesLeft==0 的話：
         // SpotManager 會觸發 HandleRoundEnded(FailedRound) 去走結尾/跳場景
     }
@@ -636,7 +699,7 @@ public class Second : MonoBehaviour
 
     }
 
-    private IEnumerator HandleFailure()//點錯位置跳jumpscare
+    private IEnumerator HandleFailure()//失敗跳jumpscare
     {
         Debug.Log("[Second] Failure feedback:jumpscare");
 
@@ -776,7 +839,20 @@ public class Second : MonoBehaviour
             HintText.gameObject.SetActive(false);
     }
 
+    public IEnumerator PlayReverse(string stateName, float duration)//倒著播放動畫
+    {
+        Animator anim = cControllScript.animator;
 
+        float t = 1f;
+        while (t > 0f)
+        {
+            anim.Play(stateName, 0, t);
+            t -= Time.deltaTime / duration;
+            yield return null;
+        }
+
+        anim.Play(stateName, 0, 0f);
+    }
 
 
 
@@ -880,9 +956,9 @@ public class Second : MonoBehaviour
             light.gameObject.SetActive(false);
 
             if (i == childCount - 1)
-                yield return new WaitForSeconds(0.8f); // 最後一顆拉長
+                yield return new WaitForSeconds(1.5f); // 最後一顆拉長
             else
-                yield return new WaitForSeconds(0.3f);// 每顆燈之間的節奏
+                yield return new WaitForSeconds(1f);// 每顆燈之間的節奏
         }
 
         yield return new WaitForSeconds(1.5f);
@@ -901,8 +977,10 @@ public class Second : MonoBehaviour
     // =====================================================
     public IEnumerator Act_HangUpPhone()
     {
-        if (PhonePanel) PhonePanel.SetActive(false);
+        //if (PhonePanel) PhonePanel.SetActive(false);
 
+        StartCoroutine(PlayReverse("phone", 2f));//倒著播放動畫
+        yield return new WaitForSeconds(2.5f);
         if (cControllScript.animator != null)
             cControllScript.animator.SetBool("phone", false);
 
@@ -921,9 +999,9 @@ public class Second : MonoBehaviour
         cControllScript.animator.SetBool("phone", true);
         yield return WaitForClipEnd(cControllScript.animator, "phone");// ← 這裡填 clip 名
 
-        if (PhonePanel != null) PhonePanel.SetActive(true);
+        //if (PhonePanel != null) PhonePanel.SetActive(true);
         yield return new WaitForSeconds(1.5f);
-        if (PhonePanel != null) PhonePanel.SetActive(false);
+        //if (PhonePanel != null) PhonePanel.SetActive(false);
 
         cControllScript.animator.SetBool("phone", false);
     }
@@ -933,7 +1011,7 @@ public class Second : MonoBehaviour
 
         cControllScript.animator.SetBool("phone", true);
         yield return WaitForClipEnd(cControllScript.animator, "phone");
-        if (PhonePanel != null) PhonePanel.SetActive(true);
+        //if (PhonePanel != null) PhonePanel.SetActive(true);
 
         // 不關，交給後面劇情關（或你再做 PickPhoneOff）
         //cControllScript.animator.SetBool("phone", false);
@@ -1001,81 +1079,37 @@ public class Second : MonoBehaviour
     // =====================================================
     // 公車物理效果
     // =====================================================
-    public IEnumerator Act_BusShakeWithDamping(bool strong)
-    {
-        if (busRb == null) yield break;
-
-        Vector3 originPos = busRb.transform.position;
-        Quaternion originRot = busRb.transform.rotation;
-
-        float duration = strong ? 1.4f : 0.9f;
-
-        float startPosAmp = strong ? 0.08f : 0.04f;
-        float startRotAmp = strong ? 6f : 3f;
-
-        float frequency = strong ? 18f : 12f;
-        float damping = strong ? 3.2f : 4.5f;
-
-        float t = 0f;
-
-        while (t < duration)
-        {
-            t += Time.fixedDeltaTime;
-
-            float normalized = t / duration;
-            float decay = Mathf.Exp(-damping * normalized);
-            float shake = Mathf.Sin(t * frequency) * decay;
-
-            // ✅ 3D 位移：只晃 X/Y，不動 Z
-            Vector3 offset = new Vector3(
-                shake * startPosAmp,
-                shake * startPosAmp * 0.4f,
-                0f
-            );
-
-            // ✅ 3D 旋轉：用 Quaternion 疊加角度（這裡繞 Z 軸晃，像車身左右晃）
-            float rotZ = shake * startRotAmp;
-            Quaternion rot = Quaternion.Euler(0f, 0f, rotZ);
-
-            busRb.MovePosition(originPos + offset);
-            busRb.MoveRotation(originRot * rot);
-
-            yield return new WaitForFixedUpdate();
-        }
-
-        // 回正
-        busRb.MovePosition(originPos);
-        busRb.MoveRotation(originRot);
-    }
     public IEnumerator Act_BusShake(bool strong)
     {
-        if (busRb == null) yield break;
+        if (busVisualRoot == null) yield break;
 
-        Vector3 originPos = busRb.position;
-        Quaternion originRot = busRb.rotation;
+        Vector3 originLocalPos = busVisualRoot.localPosition;
+        Quaternion originLocalRot = busVisualRoot.localRotation;
 
         float duration = strong ? 0.9f : 0.5f;
-        float posAmp = strong ? 0.06f : 0.03f;
-        float rotAmp = strong ? 4f : 2f;
+        float posAmp = strong ? 0.03f : 0.015f;
+        float rotAmp = strong ? 1.5f : 0.8f;
 
         float t = 0f;
 
         while (t < duration)
         {
-            t += Time.fixedDeltaTime;
+            t += Time.deltaTime;
 
-            float offsetX = Random.Range(-posAmp, posAmp);
+            float offsetX = Random.Range(-rotAmp, rotAmp);
             float offsetY = Random.Range(-posAmp * 0.5f, posAmp * 0.5f);
-            float rotZ = Random.Range(-rotAmp, rotAmp);
+            float rotZ = Random.Range(-posAmp, posAmp);
 
-            busRb.MovePosition(originPos + new Vector3(offsetX, offsetY, 0f));
-            busRb.MoveRotation(originRot * Quaternion.Euler(0f, 0f, rotZ));
+            busVisualRoot.localPosition = originLocalPos + new Vector3(offsetX, offsetY, 0f);
+            busVisualRoot.localRotation = originLocalRot * Quaternion.Euler(0f, 0f, rotZ);
 
-            yield return new WaitForFixedUpdate();
+            yield return null;
         }
 
-        busRb.MovePosition(originPos);
-        busRb.MoveRotation(originRot);
+        busVisualRoot.localPosition = originLocalPos;
+        busVisualRoot.localRotation = originLocalRot;
+
+        yield return new WaitForSeconds(1.5f);
     }
 
     // =====================================================
@@ -1186,6 +1220,18 @@ public class Second : MonoBehaviour
         yield return new WaitForSeconds(1.5f);
     }
 
+    public IEnumerator Act_WaitForSecondsCoroutine(float sec)
+    {
+        float startTime = Time.time;
+        Debug.Log($"[WaitTest] 開始等待，時間：{startTime}");
+
+        yield return new WaitForSeconds(sec);
+
+        float endTime = Time.time;
+        Debug.Log($"[WaitTest] 等待結束，時間：{endTime}，實際經過：{endTime - startTime} 秒");
+    }
+
+
     //public IEnumerator Act_BigPictureZoom()
     //{
     //    //放大圖片某處，放大位置我會放一個transform，朝著那裏放大就可以了
@@ -1226,7 +1272,7 @@ public class Second : MonoBehaviour
     //    mainCamera.transform.position = camStartPos;
     //    yield return new WaitForSeconds(1.5f);
     //}
-    
+
     //public IEnumerator Act_ShowGameTitle()
     //{
     //    GameName.SetActive(true);

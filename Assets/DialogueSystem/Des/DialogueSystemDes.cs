@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using static desC;
 
 public class DialogueSystemDes : MonoBehaviour
 {
@@ -28,6 +29,7 @@ public class DialogueSystemDes : MonoBehaviour
     [Tooltip("控制打字節奏（字元出現的間隔時間）")]public float TextSpeed = 0.06f;
     [Tooltip("繼續對話")] public bool KeepTalk;
     [Tooltip("對話中")] public bool IsTalking;
+    [Tooltip("允許快速顯示內容")] public bool allowFastReveal = true;
 
     [Header("自動播放設定")]
     [Tooltip("true 就自動下一行")] public bool autoNextLine = false;
@@ -44,6 +46,7 @@ public class DialogueSystemDes : MonoBehaviour
 
     [Header("腳本")]
     public WorldScroller worldScrollerScript;
+    public AudioSettingsUI audioSettingsUI;
 
     // ===== 內部資料 =====
     public enum LineCode { Player = 0, Action = 1, Narration = 2 }
@@ -74,11 +77,12 @@ public class DialogueSystemDes : MonoBehaviour
         //// Debug 一下確認有抓到值
         //Debug.Log($"[Dialogue] padding L={leftPadding}, R={rightPadding}");
         worldScrollerScript = FindAnyObjectByType<WorldScroller>();
+        audioSettingsUI = FindAnyObjectByType<AudioSettingsUI>();
     }
 
     void Start()
     {
-        SetPanels(false, false);
+        
     }
 
     void Update()
@@ -86,23 +90,23 @@ public class DialogueSystemDes : MonoBehaviour
         if (isBusy) return;
         if (!AnyPanelOn()) return;
 
-        if (!autoNextLine && Input.GetKeyDown(KeyCode.Space))
+        if (!Input.GetKeyDown(KeyCode.Space)) return;
+
+        if (isTyping)
         {
-            if (isTyping)
-            {
+            if (allowFastReveal)
                 FinishCurrentLineImmediately();
-                return;
-            }
-
-            index++;
-            if (index >= TextList.Count)
-            {
-                EndDialogue();
-                return;
-            }
-
-            SetTextUI();
+            return;
         }
+
+        index++;
+        if (index >= TextList.Count)
+        {
+            EndDialogue();
+            return;
+        }
+
+        SetTextUI();
     }
 
     // 從 TextAsset 讀進所有行
@@ -191,6 +195,7 @@ public class DialogueSystemDes : MonoBehaviour
     private void ShowNarra(string content)
     {
         SetPanels(false, true);
+        audioSettingsUI.PlayNarraTalk();
 
         // sticky + append：累積
         if (narraSticky && narraAppendMode)
@@ -225,6 +230,9 @@ public class DialogueSystemDes : MonoBehaviour
         typingTarget = null;
         typingFullLine = null;
 
+        // ✅ 停掉旁白 / 角色 loop 音效
+        StopDialogueVoice();
+
         if (autoNextLine)
         {
             yield return new WaitForSeconds(autoNextDelay);
@@ -233,7 +241,11 @@ public class DialogueSystemDes : MonoBehaviour
             else SetTextUI();
         }
     }
-
+    private void StopDialogueVoice()
+    {
+        if (audioSettingsUI != null)
+            audioSettingsUI.StopLoopSFX();
+    }
 
     // 正在打字時按 Space：立刻把這一行顯示完整
     private IEnumerator TypeLineAppend(TextMeshProUGUI target, string line)
@@ -263,6 +275,9 @@ public class DialogueSystemDes : MonoBehaviour
 
         typingTarget = null;
         typingFullLine = null;
+
+        // ✅ 停掉旁白 loop
+        StopDialogueVoice();
 
         if (autoNextLine)
         {
@@ -298,6 +313,9 @@ public class DialogueSystemDes : MonoBehaviour
         typingFullLine = null;
         typingCharIndex = 0;
         typingAppendMode = false;
+
+        // ✅ 玩家快轉，也算這行結束
+        StopDialogueVoice();
     }
 
 
@@ -434,7 +452,9 @@ public class DialogueSystemDes : MonoBehaviour
 
                 break;
 
-
+            case "PlayQuiteMusic":
+                yield return owner.Act_PlayQuiteMusic();
+                break;
 
 
             default:
@@ -486,7 +506,7 @@ public class DialogueSystemDes : MonoBehaviour
         SetPanels(false, false);
     }
 
-    private void SetPanels(bool playerOn, bool narraOn)
+    public void SetPanels(bool playerOn, bool narraOn)
     {
         if (TextPanel) TextPanel.SetActive(playerOn);
         if (NarraTextPanel) NarraTextPanel.SetActive(narraOn);
