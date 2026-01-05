@@ -3,7 +3,7 @@ using UnityEditor.PackageManager;
 using UnityEngine;
 using UnityEngine.Audio;
 using UnityEngine.UI;
-using static desC;
+using static VoiceType;
 using static Unity.Collections.AllocatorManager;
 
 public class AudioSettingsUI : MonoBehaviour
@@ -147,6 +147,11 @@ public class AudioSettingsUI : MonoBehaviour
         PlaySFX(SFXType.Success);
     }
 
+    public void PlayPhoto()
+    {
+        PlaySFX(SFXType.Photo);
+    }
+
     public void PlayPlayerWalk()//Loop
     {
         PlayLoopSFX(SFXType.PlayerWalk);
@@ -160,6 +165,11 @@ public class AudioSettingsUI : MonoBehaviour
     public void PlayPhoneRing()//Loop
     {
         PlayLoopSFX(SFXType.PhoneRing);
+    }
+    
+    public void PlayFail()//Loop
+    {
+        PlayLoopSFX(SFXType.Fail);
     }
 
     public void StopLoop()

@@ -1,7 +1,9 @@
 ﻿using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.UIElements;
 using UnityEngine.Video;
 
 public enum GamePhase
@@ -11,7 +13,7 @@ public enum GamePhase
     End
 }
 
-public class First : MonoBehaviour
+public class First : MonoBehaviour, ISceneInitializable
 {
     [Header("Phase")]
     public GamePhase currentPhase = GamePhase.Teaching;
@@ -24,6 +26,8 @@ public class First : MonoBehaviour
     public CControll cControllScript;
     public AnimationScript animationScript;
     public SceneChange sceneChangeScript;
+    public AudioSettingsUI audioSettingsUI;
+    public WorldScroller worldScroller;
 
     [Header("遊戲用UI")]
     public GameObject ErrorPanel;
@@ -38,12 +42,14 @@ public class First : MonoBehaviour
 
 
     [Header("其他UI")]
-    public GameObject PhonePanel;
     [Tooltip("玩家對話框還看的到")]public GameObject BlackPanel;
     [Tooltip("玩家對話框看不到")] public GameObject BlackPanel22;
     [Tooltip("遊戲名字")] public VideoPlayer GameNamevideoPlayer;
     [Tooltip("遊戲名字Rawimage")] public RawImage GameNameRawImage;
     [Tooltip("遊戲內劇情用的時間")] public GameObject Timetext;
+    [Tooltip("遊戲內劇情用的時間")] public GameObject TimetextImage;
+    [Tooltip("鈴聲")] public GameObject Ring01;
+    [Tooltip("鈴聲")]public GameObject Ring02;
 
     [Header("設定")]
     [Tooltip("設定面板")] public GameObject SettingPanel;
@@ -98,36 +104,20 @@ public class First : MonoBehaviour
     public bool _teachingDone = false;
     public bool inTeach01 = false;
 
-
     private void Awake()
     {
-        if (spotManager == null)
-            spotManager = FindAnyObjectByType<SpotManager>();
+        if (spotManager == null) spotManager = FindAnyObjectByType<SpotManager>();
+        if (timer == null) timer = FindAnyObjectByType<TimeControll>();
 
-        if (timer == null)
-            timer = FindAnyObjectByType<TimeControll>();
+        if (dialogueSystemGame00Script == null) dialogueSystemGame00Script = FindAnyObjectByType<DialogueSystemGame00>();
+        if (fader == null) fader = FindAnyObjectByType<FadeInByExposure>();
+        if (cControllScript == null) cControllScript = FindAnyObjectByType<CControll>();
+        if (animationScript == null) animationScript = FindAnyObjectByType<AnimationScript>();
+        if (sceneChangeScript == null) sceneChangeScript = FindAnyObjectByType<SceneChange>();
+        if (audioSettingsUI == null) audioSettingsUI = FindAnyObjectByType<AudioSettingsUI>();
+        if (worldScroller == null) worldScroller = FindAnyObjectByType<WorldScroller>();
 
-        dialogueSystemGame00Script = FindAnyObjectByType<DialogueSystemGame00>();
-        fader = FindAnyObjectByType<FadeInByExposure>();
-        cControllScript = FindAnyObjectByType<CControll>();
-        animationScript = FindAnyObjectByType<AnimationScript>();
-        sceneChangeScript = FindAnyObjectByType<SceneChange>();
-
-        if (dialogueSystemGame00Script != null)
-            dialogueSystemGame00Script.BindOwner(this);
-
-        CleanupUI();//關掉所有UI
-        //教學UI關掉
-        CleanupRoundUI();
-        PhotoFrameTeachTarget01.gameObject.SetActive(false);
-        PhotoFrameTeachTarget02.gameObject.SetActive(false);
-        SettingPanel.SetActive(false );
-        inTeach01 = false;
-        GameNamevideoPlayer.loopPointReached += OnVideoEnd;
-        Player.transform.position = PlayerStartPos.position;
-
-        //更新數量
-        TotalFoundChangedUI(spotManager.totalFound);
+        Time.timeScale = 1f;
     }
 
     private void OnEnable()
@@ -144,8 +134,197 @@ public class First : MonoBehaviour
 
     private void Start()
     {
+
+    }
+
+    public List<SceneInitStep> BuildInitSteps()
+    {
+        var steps = new List<SceneInitStep>();
+        const float W = 1f / 11f;
+
+        steps.Add(new SceneInitStep
+        {
+            label = "取得對話對應…",
+            weight = W,
+            action = Step_InitOwner
+        });
+
+        steps.Add(new SceneInitStep
+        {
+            label = "初始化 世界 狀態…",
+            weight = W,
+            action = Step_InitWorld
+        });
+
+        steps.Add(new SceneInitStep
+        {
+            label = "初始化 影片 狀態…",
+            weight = W,
+            action = Step_InitVideoPlayer
+        });
+
+        steps.Add(new SceneInitStep
+        {
+            label = "初始化 音效 狀態…",
+            weight = W,
+            action = Step_InitVoice
+        });
+
+        steps.Add(new SceneInitStep
+        {
+            label = "初始化 UI 狀態…",
+            weight = W,
+            action = Step_InitUI
+        });
+
+        steps.Add(new SceneInitStep
+        {
+            label = "初始化 教學 狀態…",
+            weight = W,
+            action = Step_InitTeach
+        });
+
+        steps.Add(new SceneInitStep
+        {
+            label = "初始化玩家位置…",
+            weight = W,
+            action = Step_InitPlayerPos
+        });
+
+        steps.Add(new SceneInitStep
+        {
+            label = "初始化 回合 狀態…",
+            weight = W,
+            action = Step_InitRoundUI
+        });
+
+        steps.Add(new SceneInitStep
+        {
+            label = "初始化對話狀態…",
+            weight = W,
+            action = Step_InitDialogue
+        });
+
+        steps.Add(new SceneInitStep
+        {
+            label = "載入劇情…",
+            weight = W,
+            action = Step_StartDialogue
+        });
+
+        steps.Add(new SceneInitStep
+        {
+            label = "播放場景音樂…",
+            weight = 0.1f,
+            action = Step_PlayBGM
+        });
+
+        return steps;
+    }
+
+    private IEnumerator Step_InitOwner()//對話觸發初始化
+    {
+        if (dialogueSystemGame00Script != null)
+            dialogueSystemGame00Script.BindOwner(this);
+        yield return null;
+    }
+
+    private IEnumerator Step_InitWorld()
+    {
+        worldScroller.BusMove = true;
+
+        yield return null;
+    }//世界初始化
+
+    private IEnumerator Step_InitVideoPlayer()//影片播放初始化
+    {
+        GameNamevideoPlayer.loopPointReached += OnVideoEnd;
+        yield return null;
+    }
+
+    public IEnumerator Step_InitVoice()//聲音初始化
+    {
+        // 讀取存檔的音量（沒有就用 Slider 目前值）
+        float music = PlayerPrefs.GetFloat(AudioSettingsUI.MUSIC_PARAM, audioSettingsUI.musicSlider.value);
+        float sfx = PlayerPrefs.GetFloat(AudioSettingsUI.SFX_PARAM, audioSettingsUI.sfxSlider.value);
+
+        audioSettingsUI.musicSlider.value = music;
+        audioSettingsUI.sfxSlider.value = sfx;
+
+        audioSettingsUI.ApplyMusic(music);
+        audioSettingsUI.ApplySFX(sfx);
+
+        // 綁定事件
+        audioSettingsUI.musicSlider.onValueChanged.AddListener(audioSettingsUI.ApplyMusic);
+        audioSettingsUI.sfxSlider.onValueChanged.AddListener(audioSettingsUI.ApplySFX);
+
         
 
+        yield return null;
+    }
+
+    private IEnumerator Step_InitUI()//UI初始化
+    {
+        CleanupUI();//關掉所有UI
+        //教學UI關掉
+        CleanupRoundUI();
+        PhotoFrameTeachTarget01.gameObject.SetActive(false);
+        PhotoFrameTeachTarget02.gameObject.SetActive(false);
+        SettingPanel.SetActive(false);
+
+        yield return null;
+    }
+
+    private IEnumerator Step_InitTeach()//教學初始化
+    {
+        inTeach01 = false;
+        yield return null;
+    }
+
+    private IEnumerator Step_InitPlayerPos()//玩家位置初始化
+    {
+        Player.transform.position = PlayerStartPos.position;
+        yield return null;
+    }
+    private IEnumerator Step_InitRoundUI()//回合數量初始化
+    {
+        //更新數量
+        TotalFoundChangedUI(spotManager.totalFound);
+
+        //時間
+        if (timer.timerText != null) timer.timerText.gameObject.SetActive(false);
+        timer.TimeTextImage.SetActive(false);
+        yield return null;
+    }
+
+    private IEnumerator Step_InitDialogue()
+    {
+        dialogueSystemGame00Script.SetPanels(false, false);
+        dialogueSystemGame00Script.allowFastReveal = false;
+        yield return null;
+    }
+
+
+    private IEnumerator Step_StartDialogue()
+    {
+        if (dialogueSystemGame00Script != null)
+        {
+            dialogueSystemGame00Script.autoNextLine = false;
+            dialogueSystemGame00Script.StartDialogue(dialogueSystemGame00Script.TextfileGame00);
+        }
+        yield return null;
+    }
+
+    private IEnumerator Step_PlayBGM()
+    {
+        audioSettingsUI.StopLoopBGM();
+        // 確保 loading 還沒淡出前不要播
+        yield return null; // 保證至少等一幀
+
+        if (audioSettingsUI != null)
+        {
+            audioSettingsUI.PlayDrive(); // 或你場景對應的 BGM
+        }
     }
 
     private void Update()
@@ -158,7 +337,13 @@ public class First : MonoBehaviour
             Debug.Log("1");
             SettingPanel.SetActive(!SettingPanel.activeSelf);
         }
+
+        //Debug.Log($"[TIME] timeScale={Time.timeScale}, dt={Time.deltaTime}, udt={Time.unscaledDeltaTime}");
+
+        if (Time.timeScale != 1) Time.timeScale = 1f;
+
     }
+
     //======================================================
     //設定相關細節
     //======================================================
@@ -187,7 +372,6 @@ public class First : MonoBehaviour
         yield return new WaitForSeconds(1.5f);
         PhotoFrameImage.gameObject.SetActive(true);
         PhotoFrameTeachTarget.gameObject.SetActive(true);
-        PhonePanel.gameObject.SetActive(false);
 
         // ✅（重點）鎖對話系統輸入，避免空白鍵亂跳
         dialogueSystemGame00Script.inputLocked = true; // 開始
@@ -223,6 +407,7 @@ public class First : MonoBehaviour
     // 入口1：點到 spot
     public void OnSpotClicked()
     {
+        audioSettingsUI.PlayPhoto();
         if (currentPhase == GamePhase.Teaching)
         {
             StartCoroutine( HandleSuccess());
@@ -513,6 +698,9 @@ public class First : MonoBehaviour
         if (PicturePanel != null) PicturePanel.SetActive(false);
         if (GameNameRawImage != null) GameNameRawImage.gameObject.SetActive(false);
         if (Timetext != null) Timetext.SetActive(false);
+        Ring01.SetActive(false);
+        Ring02.SetActive(false);
+        TimetextImage.SetActive(false);
         Picture02.SetActive(false);
         Picture01.SetActive(false);
     }
@@ -639,6 +827,19 @@ public class First : MonoBehaviour
         anim.Play(stateName, 0, 0f);
     }
 
+    public void BackToMenu()
+    {
+        BlackPanel.SetActive(true);
+        animationScript.Fade(
+            BlackPanel,
+            1.5f,
+            0f,
+            1f,
+            () => LoadingManager.Instance.BeginLoad("menu")
+        );
+        //BlackPanel.SetActive(false );
+    }
+
 
 
     //===========================================
@@ -733,7 +934,7 @@ public class First : MonoBehaviour
         if (cControllScript == null || WalkToFrontPos == null) yield break;
 
         cControllScript.StartAutoMoveTo(WalkToFrontPos.position);
-
+        audioSettingsUI.PlayPlayerWalk();
         yield return new WaitUntil(() => cControllScript.autoMoveFinished);
         yield return new WaitForSeconds(1f);
     }
@@ -742,7 +943,7 @@ public class First : MonoBehaviour
         if (cControllScript == null || WalkToPos2 == null) yield break;
 
         cControllScript.StartAutoMoveTo(WalkToPos2.position);
-
+        audioSettingsUI.PlayPlayerWalk();
         yield return new WaitUntil(() => cControllScript.autoMoveFinished);
         yield return new WaitForSeconds(1f);
     }
@@ -780,12 +981,27 @@ public class First : MonoBehaviour
         yield return new WaitForSeconds(1.5f);
     }
 
+    public IEnumerator Act_Wake()
+    {
+        StartCoroutine(PlayReverse("sitsleep", 1.5f));//倒著播放動畫
+        yield return new WaitForSeconds(2f);
+        if (cControllScript.animator != null)
+            cControllScript.animator.SetBool("sitsleep", false);
+
+        //cControllScript.animator.Play("phone", 0, 1f);   // 從最後一幀開始
+        //cControllScript.animator.speed = -1f;          // 反向播放
+        //yield return new WaitUntil(() => cControllScript.animator.GetCurrentAnimatorStateInfo(0).normalizedTime <= 0f);
+        //cControllScript.animator.speed = 1f; // 記得還原
+
+
+        yield return new WaitForSeconds(1f);
+    }
+
     //=============================================
     //手機操作
     //=============================================
     public IEnumerator Act_HangUpPhone()
     {
-        if (PhonePanel) PhonePanel.SetActive(false);
 
         StartCoroutine(PlayReverse("phone", 2f));//倒著播放動畫
         yield return new WaitForSeconds(2.5f);
@@ -864,6 +1080,7 @@ public class First : MonoBehaviour
     {
         //指定ShowTimeText為19:30
         Timetext.gameObject.SetActive(true);
+        TimetextImage.SetActive(true);
         Timetext.GetComponentInChildren<TextMeshProUGUI>().text = "19:00";
         yield return new WaitForSeconds(1);
         Timetext.GetComponentInChildren<TextMeshProUGUI>().text = time;

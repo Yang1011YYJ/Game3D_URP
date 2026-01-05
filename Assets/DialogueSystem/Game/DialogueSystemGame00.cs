@@ -34,6 +34,8 @@ public class DialogueSystemGame00 : MonoBehaviour
     [Tooltip("允許快速顯示內容")] public bool allowFastReveal;
     [Tooltip("第一段劇情撥完")] public bool FirstDiaFinished;
     [Tooltip("允許接收空白鍵")] public bool inputLocked = false;
+    private bool dialogueRunning = false;
+
 
 
     [Header("腳本")]
@@ -42,6 +44,7 @@ public class DialogueSystemGame00 : MonoBehaviour
     public AnimationScript animationScript;
     public SceneChange sceneChangeScript;
     public FadeInByExposure fader;
+    public AudioSettingsUI audioSettingsUI;
     public enum LineCode { Player = 0, Action = 1, Narration = 2 }
 
     // ---- 內部資料結構：每一句 = (code, content)
@@ -59,6 +62,8 @@ public class DialogueSystemGame00 : MonoBehaviour
     [Tooltip("標記是否正在打字")]public bool isTyping = false;
     private Coroutine typingRoutine;
     private bool isBusy = false; // 執行動作/等待中，先鎖住輸入
+    private int typingToken = 0;
+
 
     [Header("自動播放設定")]
     [Tooltip("true 就自動下一行")] public bool autoNextLine = false;
@@ -79,12 +84,15 @@ public class DialogueSystemGame00 : MonoBehaviour
         cControllScript = FindAnyObjectByType<CControll>();
         firstScript = FindAnyObjectByType<First>();
         animationScript = FindAnyObjectByType<AnimationScript>();
+        audioSettingsUI = FindAnyObjectByType<AudioSettingsUI>();
+
+        Debug.Log($"[Dialogue Awake] {name} id={GetInstanceID()} scene={gameObject.scene.name}");
+
     }
 
     void Start()
     {
-        SetPanels(false, false);
-        StartDialogue(TextfileGame00);
+
     }
 
     void Update()
@@ -164,14 +172,25 @@ public class DialogueSystemGame00 : MonoBehaviour
     // 從外部開始對話（可以指定要播哪個 TextAsset）
     public void StartDialogue(TextAsset textAsset)
     {
+        if (dialogueRunning)
+        {
+            Debug.LogWarning("[DialogueSystemGame01] StartDialogue called while dialogue is running. Ignored.");
+            return;
+        }
+
+        dialogueRunning = true;
+        Debug.Log($"[StartDialogue] instance={GetInstanceID()} frame={Time.frameCount}");
+
+
         if (!textAsset)
         {
             Debug.LogWarning("[DialogueSystemGame00] StartDialogue textAsset is null");
+            dialogueRunning = false;
             return;
         }
 
         if (textAsset == TextfileGame00) FirstDiaFinished = false;
-
+        inputLocked = false;
         TextfileCurrent = textAsset;
         ParseFileToEntries(TextfileCurrent);
 
@@ -316,8 +335,9 @@ public class DialogueSystemGame00 : MonoBehaviour
 
 
     // 打字機：一個字一個蹦出來
-    private IEnumerator TypeLine(TextMeshProUGUI target, string line, bool overwrite)
+    private IEnumerator TypeLine(TextMeshProUGUI target, string line, bool overwrite, int myToken)
     {
+
         if (target == null) yield break;
 
         isTyping = true;
@@ -329,11 +349,19 @@ public class DialogueSystemGame00 : MonoBehaviour
 
         if (overwrite) target.text = "";
 
+        float last = Time.realtimeSinceStartup;
+
         while (typingCharIndex < line.Length)
         {
+            if (myToken != typingToken) yield break; // ✅ 有新的一輪開始了，舊的自己退出
+
+            float now = Time.realtimeSinceStartup;
+            Debug.Log($"[TypeTick] dt={(now - last):0.000}  TextSpeed={TextSpeed:0.000}  instance={GetInstanceID()}  frame={Time.frameCount}");
+            last = now;
+
             target.text += line[typingCharIndex];
             typingCharIndex++;
-            yield return new WaitForSeconds(TextSpeed);
+            yield return new WaitForSecondsRealtime(TextSpeed);
         }
 
         isTyping = false;
@@ -341,48 +369,60 @@ public class DialogueSystemGame00 : MonoBehaviour
 
         typingTarget = null;
         typingFullLine = null;
-
+        // ✅ 停掉旁白 / 角色 loop 音效
+        StopDialogueVoice();
         if (autoNextLine)
         {
-            yield return new WaitForSeconds(autoNextDelay);
+            yield return new WaitForSecondsRealtime(autoNextDelay);
             index++;
             if (index >= TextList.Count) EndDialogue();
             else SetTextUI();
         }
     }
 
-
+    private void StopDialogueVoice()
+    {
+        if (audioSettingsUI != null)
+            audioSettingsUI.StopLoopSFX();
+    }
     // ---- 顯示/打字：集中處理，避免到處寫一樣的 code ----
     private void ShowLineOnPlayer(string content)
     {
         SetPanels(true, false);
-        typingRoutine = StartCoroutine(TypeLine(DiaText, content,true));
+        typingToken++;
+        int myToken = typingToken;
+
+        typingRoutine = StartCoroutine(TypeLine(DiaText, content,true, myToken));
     }
 
     private void ShowLineOnNarration(string content)
     {
         SetPanels(false, true);
+        audioSettingsUI.PlayNarraTalk();
+
         if (!NarraText)
         {
             Debug.LogWarning("[DialogueSystemGame00] NarraText 沒指定，旁白不顯示。");
             return;
         }
+        typingToken++;
+        int myToken = typingToken;
 
         // 旁白累加模式：不清空，直接換行加上去
         if (narraAppendMode)
         {
             StopTyping();
             isTyping = false;
-            typingRoutine = StartCoroutine(TypeLineAppend(NarraText, content));
+            typingRoutine = StartCoroutine(TypeLineAppend(NarraText, content, myToken));
         }
         else
         {
-            typingRoutine = StartCoroutine(TypeLine(NarraText, content,true));
+            typingRoutine = StartCoroutine(TypeLine(NarraText, content,true, myToken));
         }
     }
 
     // 新增：旁白 append 的打字機
-    private IEnumerator TypeLineAppend(TextMeshProUGUI target, string line)
+    private IEnumerator TypeLineAppend(TextMeshProUGUI target, string line, int myToken)
     {
         if (target == null) yield break;
 
@@ -399,9 +439,11 @@ public class DialogueSystemGame00 : MonoBehaviour
 
         while (typingCharIndex < line.Length)
         {
+            if (myToken != typingToken) yield break; // ✅ 有新的一輪開始了，舊的自己退出
+
             target.text += line[typingCharIndex];
             typingCharIndex++;
-            yield return new WaitForSeconds(TextSpeed);
+            yield return new WaitForSecondsRealtime(TextSpeed);
         }
 
         isTyping = false;
@@ -409,10 +451,11 @@ public class DialogueSystemGame00 : MonoBehaviour
 
         typingTarget = null;
         typingFullLine = null;
-
+        // ✅ 停掉旁白 / 角色 loop 音效
+        StopDialogueVoice();
         if (autoNextLine)
         {
-            yield return new WaitForSeconds(autoNextDelay);
+            yield return new WaitForSecondsRealtime(autoNextDelay);
             index++;
             if (index >= TextList.Count) EndDialogue();
             else SetTextUI();
@@ -452,6 +495,9 @@ public class DialogueSystemGame00 : MonoBehaviour
         typingFullLine = null;
         typingCharIndex = 0;
         typingAppendMode = false;
+
+        // ✅ 停掉旁白 / 角色 loop 音效
+        StopDialogueVoice();
     }
 
 
@@ -517,7 +563,7 @@ public class DialogueSystemGame00 : MonoBehaviour
                 if (cControllScript != null && cControllScript.animator != null)
                 {
                     cControllScript.animator.SetBool("eyeclose", true);
-                    yield return new WaitForSeconds(2f); // 你自己調
+                    yield return new WaitForSecondsRealtime(2f); // 你自己調
                 }
                 break;
 
@@ -525,7 +571,7 @@ public class DialogueSystemGame00 : MonoBehaviour
                 if (cControllScript != null && cControllScript.animator != null)
                 {
                     cControllScript.animator.SetBool("eyeclose", false);
-                    yield return new WaitForSeconds(1.5f);
+                    yield return new WaitForSecondsRealtime(1.5f);
                 }
                 break;
 
@@ -590,7 +636,7 @@ public class DialogueSystemGame00 : MonoBehaviour
                     NarraText.text = "";
 
                 SetPanels(false, false);
-                yield return new WaitForSeconds(1.5f);
+                yield return new WaitForSecondsRealtime(1.5f);
                 break;
 
             case "TimeJump_1930":
@@ -625,6 +671,10 @@ public class DialogueSystemGame00 : MonoBehaviour
                 yield return owner.Act_WalkToFront();
                 break;
 
+            case "Wake":
+                yield return owner.Act_Wake();
+                break;
+
             default:
                 Debug.LogWarning("[First] Unhandled action key: " + key + " raw=" + raw);
                 break;
@@ -645,6 +695,8 @@ public class DialogueSystemGame00 : MonoBehaviour
         isBusy = false;
 
         StopTyping();
+
+        dialogueRunning = false; // ✅ 核心
     }
 
     private void FinishDialogue()
@@ -653,7 +705,7 @@ public class DialogueSystemGame00 : MonoBehaviour
         {
             FirstDiaFinished = true;
             //allowFastReveal = true;
-            animationScript.Fade(firstScript.BlackPanel,1f,0f,1f, ()=> sceneChangeScript.SceneC("02"));
+            animationScript.Fade(firstScript.BlackPanel,1f,0f,1f, ()=> LoadingManager.Instance.BeginLoad("02"));
         }
         EndDialogue();
     }

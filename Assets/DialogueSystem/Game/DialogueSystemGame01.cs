@@ -30,6 +30,7 @@ public class DialogueSystemGame01 : MonoBehaviour
     [Header("控制設定")]
     [Tooltip("允許快速顯示內容")] public bool allowFastReveal = true;
     [Tooltip("允許接收空白鍵")] public bool inputLocked = false;
+    private bool dialogueRunning = false;
 
     [Header("自動播放設定")]
     [Tooltip("true 就自動下一行")] public bool autoNextLine = false;
@@ -66,22 +67,20 @@ public class DialogueSystemGame01 : MonoBehaviour
 
     [Header("腳本")]
     public CControll cControllScript;
-    public First firstScript;
     public AnimationScript animationScript;
     public SceneChange sceneChangeScript;
     public FadeInByExposure fader;
+    public AudioSettingsUI audioSettingsUI;
     void Awake()
     {
         cControllScript = FindAnyObjectByType<CControll>();
-        firstScript = FindAnyObjectByType<First>();
         animationScript = FindAnyObjectByType<AnimationScript>();
+        audioSettingsUI = FindAnyObjectByType<AudioSettingsUI>();
+        sceneChangeScript = FindAnyObjectByType<SceneChange>();
+        fader = FindAnyObjectByType<FadeInByExposure>();
     }
     void Start()
     {
-        SetPanels(false, false);
-
-        TextfileCurrent = TextfileGame01;
-        StartDialogue(TextfileCurrent);
     }
 
     void Update()
@@ -120,9 +119,20 @@ public class DialogueSystemGame01 : MonoBehaviour
 
     public void StartDialogue(TextAsset textAsset)
     {
+        if (dialogueRunning)
+        {
+            Debug.LogWarning("[DialogueSystemGame01] StartDialogue called while dialogue is running. Ignored.");
+            return;
+        }
+
+        dialogueRunning = true;
+        Debug.Log($"[StartDialogue] instance={GetInstanceID()} frame={Time.frameCount}");
+
+
         if (!textAsset)
         {
             Debug.LogWarning("[DialogueSystemGame00] textAsset is null");
+            dialogueRunning = false;
             return;
         }
         inputLocked = false;
@@ -197,6 +207,9 @@ public class DialogueSystemGame01 : MonoBehaviour
     // 打字機：一個字一個蹦出來
     private IEnumerator TypeLine(TextMeshProUGUI target, string line, bool overwrite)
     {
+        Debug.Log($"[TypeLine START] instance={GetInstanceID()} frame={Time.frameCount}");
+
+
         if (target == null) yield break;
 
         isTyping = true;
@@ -212,7 +225,7 @@ public class DialogueSystemGame01 : MonoBehaviour
         {
             target.text += line[typingCharIndex];
             typingCharIndex++;
-            yield return new WaitForSeconds(TextSpeed);
+            yield return new WaitForSecondsRealtime(TextSpeed);
         }
 
         isTyping = false;
@@ -220,15 +233,22 @@ public class DialogueSystemGame01 : MonoBehaviour
 
         typingTarget = null;
         typingFullLine = null;
-
+        // ✅ 停掉旁白 / 角色 loop 音效
+        StopDialogueVoice();
         if (autoNextLine)
         {
-            yield return new WaitForSeconds(autoNextDelay);
+            yield return new WaitForSecondsRealtime(autoNextDelay);
             index++;
             if (index >= TextList.Count) EndDialogue();
             else SetTextUI();
         }
     }
+    private void StopDialogueVoice()
+    {
+        if (audioSettingsUI != null)
+            audioSettingsUI.StopLoopSFX();
+    }
+
     // ---- 顯示/打字：集中處理，避免到處寫一樣的 code ----
     private void ShowLineOnPlayer(string content)
     {
@@ -239,6 +259,7 @@ public class DialogueSystemGame01 : MonoBehaviour
     private void ShowLineOnNarration(string content)
     {
         SetPanels(false, true);
+        audioSettingsUI.PlayNarraTalk();
         if (!NarraText)
         {
             Debug.LogWarning("[DialogueSystemGame00] NarraText 沒指定，旁白不顯示。");
@@ -278,7 +299,7 @@ public class DialogueSystemGame01 : MonoBehaviour
         {
             target.text += line[typingCharIndex];
             typingCharIndex++;
-            yield return new WaitForSeconds(TextSpeed);
+            yield return new WaitForSecondsRealtime(TextSpeed);
         }
 
         isTyping = false;
@@ -286,10 +307,11 @@ public class DialogueSystemGame01 : MonoBehaviour
 
         typingTarget = null;
         typingFullLine = null;
-
+        // ✅ 停掉旁白 / 角色 loop 音效
+        StopDialogueVoice();
         if (autoNextLine)
         {
-            yield return new WaitForSeconds(autoNextDelay);
+            yield return new WaitForSecondsRealtime(autoNextDelay);
             index++;
             if (index >= TextList.Count) EndDialogue();
             else SetTextUI();
@@ -327,6 +349,9 @@ public class DialogueSystemGame01 : MonoBehaviour
         typingFullLine = null;
         typingCharIndex = 0;
         typingAppendMode = false;
+
+        // ✅ 停掉旁白 / 角色 loop 音效
+        StopDialogueVoice();
     }
 
     // ---------- 動作系統：你可以在這裡擴充 ----------
@@ -443,6 +468,10 @@ public class DialogueSystemGame01 : MonoBehaviour
             case "HangUpPhone":
                 yield return ownerSecond.Act_HangUpPhone();
                 break;
+
+            case "PhoneRing":
+                if (ownerSecond != null) yield return ownerSecond.Act_PhoneRing();
+                break;
             //手機系統
 
             //公車相關
@@ -522,6 +551,8 @@ public class DialogueSystemGame01 : MonoBehaviour
         index = 0;
         isTyping = false;
         isBusy = false;
+
+        dialogueRunning = false; // ✅ 核心
     }
 
     private void ForceLayoutNow(TextMeshProUGUI target)

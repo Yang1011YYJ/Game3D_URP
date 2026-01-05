@@ -16,8 +16,7 @@ public class TimeControll : MonoBehaviour
 
     private void Start()
     {
-        if (timerText != null) timerText.gameObject.SetActive(false);
-        TimeTextImage.SetActive(false);
+        
     }
 
     public void StartCountdown(int seconds)//¶}©l

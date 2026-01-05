@@ -12,8 +12,6 @@ using static UnityEngine.GraphicsBuffer;
 public class desC : MonoBehaviour, ISceneInitializable
 {
     [Header("UI")]
-    [Tooltip("顯示訊息")]public GameObject PhoneMessage;
-    [Tooltip("關閉按鈕")] public GameObject CloseButton;
     [Space]
     [Tooltip("火車整體group")] public GameObject Bus;
     [Tooltip("起始位置（畫面外）")] public Transform BusStartPoint;
@@ -38,7 +36,6 @@ public class desC : MonoBehaviour, ISceneInitializable
     [Tooltip("手機鈴聲01")] public GameObject ring01;
     [Tooltip("手機鈴聲02")] public GameObject ring02;
     [Tooltip("外面世界模型")] public GameObject outside;
-    [Tooltip("外面世界地板模型")] public GameObject outsideFloor;
     [Tooltip("外面世界牆壁模型")] public GameObject outsideWall;
     [Tooltip("車子裡面模型")] public GameObject inside;
     [Tooltip("車內世界牆壁模型")] public GameObject insideWall;
@@ -48,22 +45,6 @@ public class desC : MonoBehaviour, ISceneInitializable
 
     [Tooltip("玩家進入後的位置")] public Transform InsidePos;
     [Tooltip("玩家座位位置")] public Transform InsideSitPos;
-    public enum SFXType
-    {
-        None,
-        Click,
-        Error,
-        Success,
-        PlayerWalk,
-        NarraTalk,
-        PhoneRing
-    }
-    public enum BGMType
-    {
-        None,
-        Road,
-        Drive
-    }
 
 
     [Header("相機")]
@@ -192,8 +173,6 @@ public class desC : MonoBehaviour, ISceneInitializable
     private IEnumerator Step_InitUI()
     {
         if (BlackPanel) BlackPanel.SetActive(false);
-        if (PhoneMessage) PhoneMessage.SetActive(false);
-        if (CloseButton) CloseButton.SetActive(false);
         if (DesPanel) DesPanel.SetActive(false);
         if (PlaceText) PlaceText.gameObject.SetActive(false);
         if (ring01) ring01.SetActive(false);
@@ -274,36 +253,6 @@ public class desC : MonoBehaviour, ISceneInitializable
         //BlackPanel.SetActive(false );
     }
 
-    private IEnumerator FakeEnterBus(Transform player, float dur = 0.25f)
-    {
-        var sr = player.GetComponent<SpriteRenderer>();
-        Vector3 startPos = player.position;
-        Vector3 endPos = startPos + new Vector3(0.15f, -0.1f, 0f); // 依鏡頭方向調
-        Vector3 startScale = player.localScale;
-        Vector3 endScale = startScale * 0.9f;
-
-        float startA = sr ? sr.color.a : 1f;
-        float endA = 0.2f;
-
-        float t = 0f;
-        while (t < dur)
-        {
-            t += Time.deltaTime;
-            float k = Mathf.Clamp01(t / dur);
-
-            player.position = Vector3.Lerp(startPos, endPos, k);
-            player.localScale = Vector3.Lerp(startScale, endScale, k);
-
-            if (sr)
-            {
-                var c = sr.color;
-                c.a = Mathf.Lerp(startA, endA, k);
-                sr.color = c;
-            }
-            yield return null;
-        }
-    }
-
     //public void StartButton()
     //{
     //    animationScript.Fade(BlackPanel, 1.5f, "01"));
@@ -325,8 +274,6 @@ public class desC : MonoBehaviour, ISceneInitializable
 
     public IEnumerator Act_HangUpCall()
     {
-        if (PhoneMessage) PhoneMessage.SetActive(false);
-        if (CloseButton) CloseButton.SetActive(false);
 
         StartCoroutine(PlayReverse("phone", 2f));//倒著播放動畫
         yield return new WaitForSeconds(2.5f);
@@ -355,7 +302,7 @@ public class desC : MonoBehaviour, ISceneInitializable
         }
 
         yield return new WaitForSeconds(3);
-        if (PhoneMessage) PhoneMessage.SetActive(false);
+
         //if (CloseButton) CloseButton.SetActive(false);
     }
 
@@ -365,7 +312,7 @@ public class desC : MonoBehaviour, ISceneInitializable
 
         cControllScript.Target3D = middlePoint.position;
         cControllScript.StartAutoMoveTo(cControllScript.Target3D);
-        audioSettingsUI.PlaySFX(SFXType.PlayerWalk);
+        audioSettingsUI.PlayPlayerWalk();
         yield return new WaitUntil(() => cControllScript.autoMoveFinished);
     }
 
@@ -377,7 +324,7 @@ public class desC : MonoBehaviour, ISceneInitializable
         cControllScript.autoMoveFinished = false;
         cControllScript.animator.SetBool("walk", true);
         cControllScript.isAutoMoving = true;
-        audioSettingsUI.PlaySFX(SFXType.PlayerWalk);
+        audioSettingsUI.PlayPlayerWalk();
 
         yield return new WaitUntil(() => cControllScript.autoMoveFinished);
 
@@ -399,7 +346,7 @@ public class desC : MonoBehaviour, ISceneInitializable
     {
         if (ring01) ring01.SetActive(true);
         if (ring02) ring02.SetActive(true);
-        audioSettingsUI.PlayLoopSFX(SFXType.PhoneRing);
+        audioSettingsUI.PlayPhoneRing();
 
         var a1 = ring01 ? ring01.GetComponent<Animator>() : null;
         var a2 = ring02 ? ring02.GetComponent<Animator>() : null;
@@ -423,7 +370,7 @@ public class desC : MonoBehaviour, ISceneInitializable
     public IEnumerator Act_LightDimDown()
     {
         if (fader == null) yield break;
-        yield return StartCoroutine(fader.FadeExposure(1, normalExposure, darkExposure));
+        yield return StartCoroutine(fader.FadeExposure(1.5f, normalExposure, darkExposure));
     }
 
     public IEnumerator Act_LightOn()
@@ -444,7 +391,11 @@ public class desC : MonoBehaviour, ISceneInitializable
     {
         if (fader == null) yield break;
         animationScript.Fade(BlackPanel, 1.5f, 1f, 0f, null);
-        yield return new WaitForSeconds(2f);
+        Debug.Log("BlackPanelOff START");
+
+        yield return new WaitForSecondsRealtime(2f);
+
+        Debug.Log("BlackPanelOff AFTER WAIT");
         BlackPanel.SetActive(false);
     }
 
@@ -507,7 +458,7 @@ public class desC : MonoBehaviour, ISceneInitializable
     public IEnumerator Act_Inside()
     {
         if (outside) outside.SetActive(false);
-        if (outsideFloor) outsideFloor.SetActive(false);
+
         if (outsideWall) outsideWall.SetActive(false);
         if (inside) inside.SetActive(true);
         if (insideWall) insideWall.SetActive(true);
@@ -528,7 +479,7 @@ public class desC : MonoBehaviour, ISceneInitializable
             // playerTransform.position = InsidePos.position;
         }
 
-        yield return new WaitForSeconds(1);
+        yield return new WaitForSeconds(3);
     }
 
     public IEnumerator Act_MoveToSit()
@@ -538,7 +489,7 @@ public class desC : MonoBehaviour, ISceneInitializable
         cControllScript.Target3D = InsideSitPos.position;
         cControllScript.StartAutoMoveTo(cControllScript.Target3D);
         yield return new WaitUntil(() => cControllScript.autoMoveFinished);
-        yield return new WaitForSeconds(1);
+        yield return new WaitForSeconds(1.5f);
     }
 
     public IEnumerator Act_Sleep()

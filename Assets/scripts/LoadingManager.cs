@@ -100,7 +100,7 @@ public class LoadingManager : MonoBehaviour
             // 找不到也不要卡死，直接淡出
             Debug.LogWarning("[LoadingManager] No ISceneInitializable found in scene.");
             SetProgress(1f, "完成！");
-            yield return new WaitForSeconds(0.2f);
+            yield return new WaitForSecondsRealtime(0.2f);
             yield return FadeOutLoading();
             yield break;
         }
@@ -110,7 +110,7 @@ public class LoadingManager : MonoBehaviour
         if (steps == null || steps.Count == 0)
         {
             SetProgress(1f, "完成！");
-            yield return new WaitForSeconds(0.2f);
+            yield return new WaitForSecondsRealtime(0.2f);
             yield return FadeOutLoading();
             yield break;
         }
@@ -152,7 +152,7 @@ public class LoadingManager : MonoBehaviour
 
         // 5) 完成 → 淡出
         SetProgress(1f, "完成！");
-        yield return new WaitForSeconds(0.08f);
+        yield return new WaitForSecondsRealtime(0.08f);
         yield return FadeOutLoading();
     }
 
@@ -190,6 +190,7 @@ public class LoadingManager : MonoBehaviour
 
     private IEnumerator FadeOutLoading()
     {
+        Time.timeScale = 1f;
         if (!loadingGroup) yield break;
 
         float t = 0f;
@@ -205,6 +206,7 @@ public class LoadingManager : MonoBehaviour
         loadingGroup.alpha = 0f;
         loadingGroup.blocksRaycasts = false;
         loadingGroup.interactable = false;
+        Time.timeScale = 1f;
     }
 
     private void SetProgress(float value01, string msg)

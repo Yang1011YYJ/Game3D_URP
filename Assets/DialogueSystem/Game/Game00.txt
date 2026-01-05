@@ -1,7 +1,5 @@
 ﻿1
-eyeclose
-1
-LightOn
+Wake
 1
 BusLightBright
 1

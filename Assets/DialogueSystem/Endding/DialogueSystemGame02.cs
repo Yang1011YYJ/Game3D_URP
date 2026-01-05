@@ -14,9 +14,9 @@ public class DialogueSystemGame02 : MonoBehaviour
     public GameObject TextPanel;
     public TextMeshProUGUI DiaText;
 
-    [Header("旁白")]
+    [Header("旁白UI")]
     public GameObject NarraTextPanel;
-    public TextMeshProUGUI NarraText;
+    public TextMeshProUGUI NarraDiaText;
 
     [Header("文本")]
     public TextAsset TextfileCurrent;
@@ -29,6 +29,7 @@ public class DialogueSystemGame02 : MonoBehaviour
     public bool playOnEnable = false;
     [Tooltip("允許快速顯示內容")] public bool allowFastReveal = true;
     [Tooltip("允許接收空白鍵")] public bool inputLocked = false;
+    private bool dialogueRunning = false;
 
     [Header("自動播放設定")]
     [Tooltip("true 就自動下一行")] public bool autoNextLine = false;
@@ -43,6 +44,8 @@ public class DialogueSystemGame02 : MonoBehaviour
     private bool typingAppendMode;
     public enum LineCode { Player = 0, Action = 1, Narration = 2 }
 
+    [Header("腳本")]
+    public AudioSettingsUI audioSettingsUI;
     public struct DialogueEntry
     {
         public LineCode code;
@@ -59,17 +62,12 @@ public class DialogueSystemGame02 : MonoBehaviour
     private bool isBusy = false;
     private void Awake()
     {
-        
+        audioSettingsUI = FindAnyObjectByType<AudioSettingsUI>();
     }
 
     void Start()
     {
-        SetPanels(false, false);
-        allowFastReveal = false;
 
-        TextfileCurrent = TextfileGame03_1;
-        if (TextfileCurrent != null)
-            StartDialogue(TextfileCurrent);
     }
 
     void Update()
@@ -97,12 +95,20 @@ public class DialogueSystemGame02 : MonoBehaviour
 
     public void StartDialogue(TextAsset textAsset)
     {
-        if (!textAsset)
+        if (dialogueRunning)
         {
-            Debug.LogWarning("[DialogueSystemGame00] textAsset is null");
+            Debug.LogWarning("[DialogueSystemGame01] StartDialogue called while dialogue is running. Ignored.");
             return;
         }
 
+        dialogueRunning = true;
+        if (!textAsset)
+        {
+            Debug.LogWarning("[DialogueSystemGame00] textAsset is null");
+            dialogueRunning = false;
+            return;
+        }
+        inputLocked = false;
         TextfileCurrent = textAsset;
         ParseFileToEntries(TextfileCurrent);
 
@@ -157,13 +163,11 @@ public class DialogueSystemGame02 : MonoBehaviour
         switch (line.code)
         {
             case LineCode.Player:
-                SetPanels(true, false);
-                typingRoutine = StartCoroutine(TypeLine(DiaText, line.content,true));
+                ShowPlayer(line.content);
                 break;
 
             case LineCode.Narration:
-                SetPanels(false, true);
-                typingRoutine = StartCoroutine(TypeLine(NarraText, line.content,true));
+                ShowNarra(line.content);
                 break;
 
             case LineCode.Action:
@@ -172,6 +176,31 @@ public class DialogueSystemGame02 : MonoBehaviour
                 break;
         }
     }
+
+    private void StopDialogueVoice()
+    {
+        if (audioSettingsUI != null)
+            audioSettingsUI.StopLoopSFX();
+    }
+
+    private void ShowPlayer(string content)
+    {
+        SetPanels(true, false);
+        typingRoutine = StartCoroutine(TypeLine(DiaText, content, overwrite: true));
+    }
+
+    private void ShowNarra(string content)
+    {
+        SetPanels(false, true);
+        audioSettingsUI.PlayNarraTalk();
+
+        // sticky + append：累積
+        if (narraSticky && narraAppendMode)
+            typingRoutine = StartCoroutine(TypeLineAppend(NarraDiaText, content));
+        else
+            typingRoutine = StartCoroutine(TypeLine(NarraDiaText, content, overwrite: true));
+    }
+    //打字機：一個字一個蹦出來
 
     private IEnumerator TypeLine(TextMeshProUGUI target, string line, bool overwrite)
     {
@@ -190,7 +219,7 @@ public class DialogueSystemGame02 : MonoBehaviour
         {
             target.text += line[typingCharIndex];
             typingCharIndex++;
-            yield return new WaitForSeconds(TextSpeed);
+            yield return new WaitForSecondsRealtime(TextSpeed);
         }
 
         isTyping = false;
@@ -198,10 +227,11 @@ public class DialogueSystemGame02 : MonoBehaviour
 
         typingTarget = null;
         typingFullLine = null;
-
+        // ✅ 停掉旁白 / 角色 loop 音效
+        StopDialogueVoice();
         if (autoNextLine)
         {
-            yield return new WaitForSeconds(autoNextDelay);
+            yield return new WaitForSecondsRealtime(autoNextDelay);
             index++;
             if (index >= TextList.Count) EndDialogue();
             else SetTextUI();
@@ -227,7 +257,7 @@ public class DialogueSystemGame02 : MonoBehaviour
         {
             target.text += line[typingCharIndex];
             typingCharIndex++;
-            yield return new WaitForSeconds(TextSpeed);
+            yield return new WaitForSecondsRealtime(TextSpeed);
         }
 
         isTyping = false;
@@ -235,10 +265,11 @@ public class DialogueSystemGame02 : MonoBehaviour
 
         typingTarget = null;
         typingFullLine = null;
-
+        // ✅ 停掉旁白 / 角色 loop 音效
+        StopDialogueVoice();
         if (autoNextLine)
         {
-            yield return new WaitForSeconds(autoNextDelay);
+            yield return new WaitForSecondsRealtime(autoNextDelay);
             index++;
             if (index >= TextList.Count) EndDialogue();
             else SetTextUI();
@@ -285,7 +316,7 @@ public class DialogueSystemGame02 : MonoBehaviour
 
             case "WaitforSecond1":
                 if (ownerFail != null) yield return ownerFail.Act_WaitforSecond1();
-                else yield return new WaitForSeconds(1f);
+                else yield return new WaitForSecondsRealtime(1f);
                 break;
 
             case "StopInBlack":
@@ -339,6 +370,9 @@ public class DialogueSystemGame02 : MonoBehaviour
         typingFullLine = null;
         typingCharIndex = 0;
         typingAppendMode = false;
+
+        // ✅ 停掉旁白 / 角色 loop 音效
+        StopDialogueVoice();
     }
 
 
@@ -359,6 +393,8 @@ public class DialogueSystemGame02 : MonoBehaviour
         StopTyping();
         index = 0;
         isBusy = false;
+
+        dialogueRunning = false;
     }
 
     private void ForceLayoutNow(TextMeshProUGUI target)

@@ -30,6 +30,8 @@ public class DialogueSystemDes : MonoBehaviour
     [Tooltip("繼續對話")] public bool KeepTalk;
     [Tooltip("對話中")] public bool IsTalking;
     [Tooltip("允許快速顯示內容")] public bool allowFastReveal = true;
+    private bool dialogueRunning = false;
+
 
     [Header("自動播放設定")]
     [Tooltip("true 就自動下一行")] public bool autoNextLine = false;
@@ -113,9 +115,21 @@ public class DialogueSystemDes : MonoBehaviour
     // 從外部開始對話（可以指定要播哪個 TextAsset）
     public void StartDialogue(TextAsset textAsset)
     {
+        if (dialogueRunning)
+        {
+            Debug.LogWarning("[DialogueSystemGame01] StartDialogue called while dialogue is running. Ignored.");
+            return;
+        }
+
+        dialogueRunning = true;
+
+        Debug.Log($"[StartDialogue] instance={GetInstanceID()} frame={Time.frameCount}");
+
+
         if (textAsset == null)
         {
             Debug.LogWarning("[DialogueSystemDes] StartDialogue textAsset is null");
+            dialogueRunning = false;
             return;
         }
 
@@ -221,7 +235,7 @@ public class DialogueSystemDes : MonoBehaviour
         {
             target.text += line[typingCharIndex];
             typingCharIndex++;
-            yield return new WaitForSeconds(TextSpeed);
+            yield return new WaitForSecondsRealtime(TextSpeed);
         }
 
         isTyping = false;
@@ -235,7 +249,7 @@ public class DialogueSystemDes : MonoBehaviour
 
         if (autoNextLine)
         {
-            yield return new WaitForSeconds(autoNextDelay);
+            yield return new WaitForSecondsRealtime(autoNextDelay);
             index++;
             if (index >= TextList.Count) EndDialogue();
             else SetTextUI();
@@ -267,7 +281,7 @@ public class DialogueSystemDes : MonoBehaviour
         {
             target.text += line[typingCharIndex];
             typingCharIndex++;
-            yield return new WaitForSeconds(TextSpeed);
+            yield return new WaitForSecondsRealtime(TextSpeed);
         }
 
         isTyping = false;
@@ -281,7 +295,7 @@ public class DialogueSystemDes : MonoBehaviour
 
         if (autoNextLine)
         {
-            yield return new WaitForSeconds(autoNextDelay);
+            yield return new WaitForSecondsRealtime(autoNextDelay);
             index++;
             if (index >= TextList.Count) EndDialogue();
             else SetTextUI();
@@ -397,7 +411,7 @@ public class DialogueSystemDes : MonoBehaviour
             case "waitforSecs":
                 // 從 actionText 抓第一個數字，抓不到就預設 2 秒
                 float sec = ExtractFirstNumber(actionText, 2f);
-                yield return new WaitForSeconds(sec);
+                yield return new WaitForSecondsRealtime(sec);
                 break;
 
             case "LightDimDown":
@@ -504,6 +518,8 @@ public class DialogueSystemDes : MonoBehaviour
         isBusy = false;
         index = 0;
         SetPanels(false, false);
+
+        dialogueRunning = false;
     }
 
     public void SetPanels(bool playerOn, bool narraOn)

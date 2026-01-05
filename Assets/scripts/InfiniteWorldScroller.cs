@@ -112,6 +112,8 @@ public class WorldScroller : MonoBehaviour
         {
             BusMove = false;
         }
+        Debug.Log($"worldRoot={worldRoot.position.x} floor={GameObject.Find("Floor\").transform.position.x}")}");
+
     }
 
     public void StartMove_Speed(float speed)
