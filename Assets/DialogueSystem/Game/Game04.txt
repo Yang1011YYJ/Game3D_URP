@@ -17,7 +17,7 @@ PhoneRing
 0
 ......
 1
-PickUPPhone(接電話)
+PickPhoneOn(接電話)
 0
 ......喂？
 2

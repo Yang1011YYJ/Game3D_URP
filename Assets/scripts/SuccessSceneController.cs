@@ -281,11 +281,7 @@ public class SuccessSceneController : MonoBehaviour, ISceneInitializable
     {
         // 淡出
         BlackPanel2.SetActive(true);
-        animationScript.Fade(BlackPanel2, 1f, 0f, 1f, null);
-
-        // 等淡出完成（時間要跟 Fade 一致）
-        yield return new WaitForSeconds(2f);
-
-        SceneManager.LoadScene("menu");
+        animationScript.Fade(BlackPanel2, 1f, 0f, 1f, ()=>LoadingManager.Instance.BeginLoad("menu"));
+        yield return null;
     }
 }

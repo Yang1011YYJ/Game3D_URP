@@ -670,6 +670,10 @@ public class DialogueSystemGame00 : MonoBehaviour
                 yield return owner.Act_WalkToFront();
                 break;
 
+            case "WalkToPos2":
+                yield return owner.Act_WalkToPos2();
+                break;
+
             case "Wake":
                 yield return owner.Act_Wake();
                 break;
