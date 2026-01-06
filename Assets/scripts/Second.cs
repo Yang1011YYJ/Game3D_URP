@@ -605,6 +605,8 @@ public class Second : MonoBehaviour, ISceneInitializable
     }
     private void HandleLivesChanged(int livesLeft)//生命改變
     {
+        if (_mistakeRoutine != null) return; // ✅ 正在播扣命演出就不要再進來
+
         // 還沒開始正式遊戲時（ResetGame / BeginRound 同步）不要演出
         if (!_gameStarted)
         {
@@ -711,6 +713,10 @@ public class Second : MonoBehaviour, ISceneInitializable
 
             _pendingEnding = EndingIntent.Fail;
 
+            // ✅ 解鎖對話輸入，不然會像卡住
+            if (dialogueSystemGame01Script != null)
+                dialogueSystemGame01Script.inputLocked = false;
+
             // 播放失敗劇情
             dialogueSystemGame01Script.keepTalk = true;
             dialogueSystemGame01Script.TextfileCurrent = dialogueSystemGame01Script.TextfileGame03;
@@ -789,6 +795,7 @@ public class Second : MonoBehaviour, ISceneInitializable
     private IEnumerator LifeLostFlow(int livesLeft)//生命-1
     {
         Debug.Log("生命-1");
+        DisableBackgroundClick();   // ✅ 避免 jumpscare 期間連點又扣命
         // ✅ 先暫停，避免玩家在 jumpscare 期間又扣第二次
         spotManager.PauseRound();
 
@@ -824,7 +831,7 @@ public class Second : MonoBehaviour, ISceneInitializable
             HintText.alpha = 1;
             HintText.text = "再試一次!";
 
-
+            EnableBackgroundClick(); // ✅ 回合繼續才開回去
             spotManager.ResumeRound();// 回到可點擊狀態
             yield break;
         }
@@ -838,6 +845,7 @@ public class Second : MonoBehaviour, ISceneInitializable
 
         // ⭐ 用完一定要重置，不然下一回合會殘留
         _endedByTimeout = false;
+        _mistakeRoutine = null;
         // livesLeft==0 的話：
         // SpotManager 會觸發 HandleRoundEnded(FailedRound) 去走結尾/跳場景
     }
@@ -932,6 +940,8 @@ public class Second : MonoBehaviour, ISceneInitializable
         if (RedPanel != null) RedPanel.SetActive(false);
         if (GameName != null) GameName.SetActive(false);
         if (Timetext != null) Timetext.SetActive(false);
+        if (ring01 != null) ring01.SetActive(false);
+        if (ring02 != null) ring02.SetActive(false);
         TimetextImage.SetActive(false);
     }
 

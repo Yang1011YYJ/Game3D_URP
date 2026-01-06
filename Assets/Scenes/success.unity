@@ -355,15 +355,15 @@ RectTransform:
   m_GameObject: {fileID: 50544719}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: -59}
-  m_LocalScale: {x: 5.5967784, y: 5.5967784, z: 5.5967784}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 388270799}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 191}
-  m_SizeDelta: {x: 200, y: 50}
+  m_SizeDelta: {x: 1920, y: 500}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!225 &50544721
 CanvasGroup:
@@ -397,7 +397,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "END-\u8FF7\u9014"
+  m_text: "END-\u56DE\u5BB6"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 0e3706e96b1738b41ba4b41cdebd5860, type: 2}
   m_sharedMaterial: {fileID: 5832394274478373412, guid: 0e3706e96b1738b41ba4b41cdebd5860,
@@ -425,8 +425,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
-  m_fontSizeBase: 36
+  m_fontSize: 238.3
+  m_fontSizeBase: 238.3
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -728,10 +728,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 542ced2abee18474485d4e583ed4d283, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  worldScroller: {fileID: 0}
+  worldScroller: {fileID: 473042709}
   animationScript: {fileID: 210046155}
   dialogue03: {fileID: 210046163}
-  audioSettingsUI: {fileID: 0}
+  audioSettingsUI: {fileID: 210046165}
   fader: {fileID: 210046164}
   SuccessWordText: {fileID: 50544722}
   SuccessWord: "END-\u56DE\u5BB6"
@@ -759,7 +759,7 @@ MonoBehaviour:
   TextPanel: {fileID: 0}
   DiaText: {fileID: 0}
   NarraTextPanel: {fileID: 425618215}
-  NarraDiaText: {fileID: 0}
+  NarraDiaText: {fileID: 2014420817}
   TextfileCurrent: {fileID: 0}
   TextfileGame04_1: {fileID: 4900000, guid: c13f9879b0d79dc45880390d049c43f6, type: 3}
   TextSpeed: 0.06
@@ -772,7 +772,7 @@ MonoBehaviour:
   narraAppendMode: 0
   index: 0
   isTyping: 0
-  audioSettingsUI: {fileID: 0}
+  audioSettingsUI: {fileID: 210046165}
 --- !u!114 &210046164
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3547,6 +3547,16 @@ PrefabInstance:
       propertyPath: m_SizeDelta.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2985437275359276653, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
+        type: 3}
+      propertyPath: m_text
+      value: '                     .'
+      objectReference: {fileID: 0}
+    - target: {fileID: 2985437275359276653, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
+        type: 3}
+      propertyPath: m_fontStyle
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 4110228951978081813, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
         type: 3}
       propertyPath: m_Pivot.x
@@ -3657,6 +3667,16 @@ PrefabInstance:
       propertyPath: m_SizeDelta.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 4489317109383702213, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
+        type: 3}
+      propertyPath: m_text
+      value: '                       ...'
+      objectReference: {fileID: 0}
+    - target: {fileID: 4489317109383702213, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
+        type: 3}
+      propertyPath: m_fontStyle
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6445607535920922293, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
         type: 3}
       propertyPath: m_SizeDelta.x
@@ -3720,7 +3740,7 @@ PrefabInstance:
     - target: {fileID: 8839610689328155099, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
         type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 200.32
+      value: 191.505
       objectReference: {fileID: 0}
     - target: {fileID: 8839610689328155099, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
         type: 3}
@@ -3732,11 +3752,33 @@ PrefabInstance:
       propertyPath: m_Name
       value: TalkPanel-narra
       objectReference: {fileID: 0}
+    - target: {fileID: 9192440306575868081, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
+        type: 3}
+      propertyPath: m_text
+      value: '                      ..'
+      objectReference: {fileID: 0}
+    - target: {fileID: 9192440306575868081, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
+        type: 3}
+      propertyPath: m_fontStyle
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 3fe24b032f6d1c04ea13e52beaed6ba2, type: 3}
+--- !u!114 &2014420817 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4173204857190358275, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
+    type: 3}
+  m_PrefabInstance: {fileID: 2014420816}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &2087221332
 GameObject:
   m_ObjectHideFlags: 0

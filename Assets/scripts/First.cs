@@ -72,6 +72,16 @@ public class First : MonoBehaviour, ISceneInitializable
     [Tooltip("教學用目標")]public Transform PhotoFrameTeachTarget;
     [Tooltip("第一次教學用目標")] public Transform PhotoFrameTeachTarget01;
     [Tooltip("第二次教學用目標")] public Transform PhotoFrameTeachTarget02;
+    public GameObject Target02Spot;
+    [Header("Background Click")]
+    public GameObject BackgroundButton; // 透明全螢幕 Button 的 GameObject
+
+    [Header("Teach2 Timer & Mistake")]
+    public bool enableTeach2Timer = true;     // ✅ 教學2要不要啟用計時（你要的是 true）
+    public int teach2MistakeLimit = 2;         // ✅ 錯兩次就強制成功
+    private int _teach2Mistakes = 0;
+    private bool _teach2EndedByTimeout = false;
+
 
     // 內部旗標
     [Tooltip("是否開啟拍照框跟隨滑鼠")] private bool photoFrameFollowEnabled = false;
@@ -270,7 +280,10 @@ public class First : MonoBehaviour, ISceneInitializable
         CleanupRoundUI();
         PhotoFrameTeachTarget01.gameObject.SetActive(false);
         PhotoFrameTeachTarget02.gameObject.SetActive(false);
+        Target02Spot.SetActive(false);
         SettingPanel.SetActive(false);
+
+        DisableBackgroundClick();
 
         yield return null;
     }
@@ -407,6 +420,9 @@ public class First : MonoBehaviour, ISceneInitializable
     // 入口1：點到 spot
     public void OnSpotClicked()
     {
+        Teach2StopTimer();
+        DisableBackgroundClick();
+        photoFrameFollowEnabled = false;
         audioSettingsUI.PlayPhoto();
         if (currentPhase == GamePhase.Teaching)
         {
@@ -414,13 +430,22 @@ public class First : MonoBehaviour, ISceneInitializable
             return;
         }
 
-        if (currentPhase == GamePhase.Playing)
-        {
-            spotManager.OnPlaySpotClick();
-            return;
-        }
+
 
     }
+
+    public void OnBackgroundClicked()
+    {
+        if (currentPhase != GamePhase.Teaching) return;
+        if (inTeach01) return; // ✅ 教學1不要算錯（你目前是固定引導）
+
+        // 避免 timer 的 onTimeUp 也同時打進來
+        Teach2StopTimer();
+        _teach2EndedByTimeout = false;
+
+        RegisterTeach2Mistake();
+    }
+
     // =====================================================
     // 🎓 教學流程
     // =====================================================
@@ -478,8 +503,22 @@ public class First : MonoBehaviour, ISceneInitializable
 
         PhotoFrameTeachTarget01.gameObject.SetActive(false);
         PhotoFrameTeachTarget02.gameObject.SetActive(true);
+        Target02Spot.GetComponent<UnityEngine.UI.Button>().interactable = true;
+        Target02Spot.SetActive(true);
         HintText.gameObject.GetComponent<CanvasGroup>().alpha = 1;
         PhotoFrameImage.GetComponent<CanvasGroup>().alpha = 1;
+
+        // ✅ 教學2：允許跟隨滑鼠（你要的「正式遊戲那套感覺」）
+        photoFrameFollowEnabled = true;
+
+        // ✅ 教學2：背景可點（點錯就 jumpscare）
+        EnableBackgroundClick();
+
+        // ✅ 教學2：重置失誤計數、開計時
+        _teach2Mistakes = 0;
+        if (enableTeach2Timer)
+            Teach2StartTimer();
+
         yield return null;
         teachRoutine = null;
     }
@@ -487,6 +526,7 @@ public class First : MonoBehaviour, ISceneInitializable
     {
         PhotoFrameTeachTarget01.gameObject.SetActive(false);
         PhotoFrameTeachTarget02.gameObject.SetActive(false);
+        Target02Spot.SetActive(false);
         Picture01.gameObject.SetActive(false);
         Picture02.gameObject.SetActive(false);
 
@@ -496,10 +536,92 @@ public class First : MonoBehaviour, ISceneInitializable
         currentPhase = GamePhase.Playing;
     }
 
+    private void Teach2StartTimer()
+    {
+        if (timer == null) return;
+
+        _teach2EndedByTimeout = false;
+        timer.onTimeUp = () =>
+        {
+            _teach2EndedByTimeout = true;
+            RegisterTeach2Mistake();
+        };
+        timer.StartCountdown(roundSeconds);
+    }
+
+    private void Teach2StopTimer()
+    {
+        if (timer == null) return;
+        timer.onTimeUp = null;
+        timer.ForceEnd();
+    }
+
+    private void RegisterTeach2Mistake()
+    {
+        // 只處理 教學第二關（inTeach01 == false）
+        if (currentPhase != GamePhase.Teaching) return;
+        if (inTeach01) return;
+
+        _teach2Mistakes++;
+
+        // 第1次：jumpscare + 再來一次
+        if (_teach2Mistakes < teach2MistakeLimit)
+        {
+            StartCoroutine(Teach2MistakeRetryFlow());
+            return;
+        }
+
+        // 第2次：直接當作點對，繼續教學（不播失敗劇情）
+        Teach2StopTimer();
+        DisableBackgroundClick();
+        photoFrameFollowEnabled = false;
+
+        // ✅ 強制觸發「點對」流程
+        StartCoroutine(HandleSuccess());
+    }
+
+    private IEnumerator Teach2MistakeRetryFlow()
+    {
+        // 防止短時間重複扣（例如點背景狂點）
+        Teach2StopTimer();
+
+        // jumpscare
+        yield return StartCoroutine(HandleFailure());
+
+        // 提示
+        if (HintText != null)
+        {
+            HintText.gameObject.SetActive(true);
+            var cg = HintText.GetComponent<CanvasGroup>();
+            if (cg) cg.alpha = 1;
+
+            HintText.text = _teach2EndedByTimeout ? "太慢了！再試一次！" : "這裡沒有異常！再試一次！";
+        }
+
+        yield return new WaitForSeconds(1.2f);
+
+        if (HintText != null) HintText.gameObject.SetActive(true);
+        _teach2EndedByTimeout = false;
+
+        // ✅ 重啟計時，繼續教學
+        Teach2StartTimer();
+    }
+
+
 
     // =====================================================
     // 🎮 正式遊戲流程
     // =====================================================
+
+    private void EnableBackgroundClick()
+    {
+        if (BackgroundButton != null) BackgroundButton.SetActive(true);
+    }
+
+    private void DisableBackgroundClick()
+    {
+        if (BackgroundButton != null) BackgroundButton.SetActive(false);
+    }
 
 
     // =====================================================
@@ -555,54 +677,18 @@ public class First : MonoBehaviour, ISceneInitializable
 
     private void CheckFinalResultOrContinue()//判斷是通關還是失敗
     {
-        if (spotManager.IsWin())
+        if (currentPhase == GamePhase.Teaching)
         {
-            Debug.Log("[First] GAME WIN");
-            currentPhase = GamePhase.End;
-
-            StartCoroutine(GoToWinScene());
+            Debug.Log("[First] Teaching mode: skip win/lose check");
             return;
         }
 
-        if (spotManager.IsGameEnded())
-        {
-            Debug.Log("[First] GAME OVER");
-            currentPhase = GamePhase.End;
-
-            StartCoroutine(GoToLoseScene());
-            return;
-        }
+        
 
         // 還沒結束 → 等劇情再呼叫下一次 GameStart
         Debug.Log("[First] Round finished, wait for story");
     }
-
-    private IEnumerator GoToWinScene()
-    {
-        // 可選：淡出、關燈、音效
-        yield return new WaitForSeconds(0.5f);
-
-        animationScript.Fade(
-            BlackPanel,
-            1f,
-            0f,
-            1f,
-            () => sceneChangeScript.SceneC("success")
-        );
-    }
-
-    private IEnumerator GoToLoseScene()
-    {
-        yield return new WaitForSeconds(0.5f);
-
-        animationScript.Fade(
-            BlackPanel,
-            1f,
-            0f,
-            1f,
-            () => sceneChangeScript.SceneC("fail")
-        );
-    }
+    
     private void TotalFoundChangedUI(int totalFound)//更新UI
     {
         if (countText == null || spotManager == null) return;
@@ -703,6 +789,7 @@ public class First : MonoBehaviour, ISceneInitializable
         TimetextImage.SetActive(false);
         Picture02.SetActive(false);
         Picture01.SetActive(false);
+        BackgroundButton.SetActive(false);
     }
 
     private void CleanupRoundUI()//關掉遊戲會用到的UI
@@ -714,6 +801,8 @@ public class First : MonoBehaviour, ISceneInitializable
         countText.gameObject.SetActive(false);
         PhotoFrameTeachTarget01.gameObject .SetActive(false);
         PhotoFrameTeachTarget02.gameObject .SetActive(false);
+        Target02Spot.SetActive(false);
+        BackgroundButton.SetActive(false);
     }
 
     // =====================================================

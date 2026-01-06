@@ -4846,6 +4846,16 @@ PrefabInstance:
       propertyPath: m_SizeDelta.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2985437275359276653, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
+        type: 3}
+      propertyPath: m_text
+      value: '                     .'
+      objectReference: {fileID: 0}
+    - target: {fileID: 2985437275359276653, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
+        type: 3}
+      propertyPath: m_fontStyle
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 4110228951978081813, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
         type: 3}
       propertyPath: m_Pivot.x
@@ -4956,6 +4966,16 @@ PrefabInstance:
       propertyPath: m_SizeDelta.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 4489317109383702213, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
+        type: 3}
+      propertyPath: m_text
+      value: '                       ...'
+      objectReference: {fileID: 0}
+    - target: {fileID: 4489317109383702213, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
+        type: 3}
+      propertyPath: m_fontStyle
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6445607535920922293, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
         type: 3}
       propertyPath: m_SizeDelta.x
@@ -5019,7 +5039,7 @@ PrefabInstance:
     - target: {fileID: 8839610689328155099, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
         type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 200.32
+      value: 191.505
       objectReference: {fileID: 0}
     - target: {fileID: 8839610689328155099, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
         type: 3}
@@ -5030,6 +5050,16 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Name
       value: TalkPanel-narra
+      objectReference: {fileID: 0}
+    - target: {fileID: 9192440306575868081, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
+        type: 3}
+      propertyPath: m_text
+      value: '                      ..'
+      objectReference: {fileID: 0}
+    - target: {fileID: 9192440306575868081, guid: 3fe24b032f6d1c04ea13e52beaed6ba2,
+        type: 3}
+      propertyPath: m_fontStyle
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

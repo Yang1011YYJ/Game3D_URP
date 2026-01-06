@@ -122,7 +122,8 @@ public class DialogueSystemGame01 : MonoBehaviour
         if (dialogueRunning)
         {
             Debug.LogWarning("[DialogueSystemGame01] StartDialogue called while dialogue is running. Ignored.");
-            return;
+            ForceEndDialogue(); // ⭐ 關鍵在這
+            
         }
 
         dialogueRunning = true;
@@ -149,6 +150,27 @@ public class DialogueSystemGame01 : MonoBehaviour
         index = 0;
         SetTextUI();
     }
+
+    void ForceEndDialogue()
+    {
+        // 停掉所有對話協程
+        StopAllCoroutines();
+
+        // 重置狀態
+        dialogueRunning = false;
+        inputLocked = false;
+
+        // 清資料
+        TextList.Clear();
+        index = 0;
+
+        // 關 UI（依你實際用的）
+        SetPanels(false, false);
+        StopTyping();
+
+        Debug.Log("[DialogueSystemGame01] Dialogue force ended.");
+    }
+
 
     private void ParseFileToEntries(TextAsset file)
     {
